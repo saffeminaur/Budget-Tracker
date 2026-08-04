@@ -1,6 +1,8 @@
-import Link from "next/link";
+import { addHsbcValuation } from "@/actions/hsbc";
+import { EntryForm } from "@/components/entry-form";
+import { MendakiReminderBanner } from "@/components/mendaki-reminder-banner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMonthYear } from "@/lib/utils";
+import { cn, formatMonthYear } from "@/lib/utils";
 
 interface RemindersCardProps {
   dueForMonth: Date;
@@ -13,8 +15,10 @@ interface RemindersCardProps {
   hideWhenEmpty?: boolean;
 }
 
-// Compact "pill" teasers — tapping one takes you to the page with the full
-// confirm/log flow, rather than duplicating those forms here.
+// Each reminder is actionable right here — confirming a loan repayment or
+// logging a portfolio value doesn't require leaving the dashboard. The
+// card gets an amber "needs attention" accent (never lime, which reads as
+// "positive" everywhere else) whenever something's actually due.
 export function RemindersCard({
   dueForMonth,
   showLoanReminder,
@@ -26,27 +30,36 @@ export function RemindersCard({
   if (!hasAny && hideWhenEmpty) return null;
 
   return (
-    <Card className="h-full">
+    <Card
+      className={cn(
+        "h-full",
+        hasAny && "border-l-4 border-l-warning bg-warning/5"
+      )}
+    >
       <CardHeader>
         <CardTitle className="text-base">Reminders</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-4">
         {showLoanReminder && (
-          <Link
-            href="/mendaki"
-            className="block rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            Loan repayment due for {formatMonthYear(dueForMonth)}
-          </Link>
+          <MendakiReminderBanner dueForMonth={dueForMonth} bare />
         )}
+
         {showInvestmentsReminder && (
-          <Link
-            href="/hsbc"
-            className="block rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            Update portfolio value for {formatMonthYear(dueForMonth)}
-          </Link>
+          <div className={cn("space-y-2", showLoanReminder && "border-t pt-4")}>
+            <p className="text-sm font-medium">
+              Update portfolio value for {formatMonthYear(dueForMonth)}
+            </p>
+            <EntryForm
+              action={addHsbcValuation}
+              triggerLabel="Log now"
+              dialogTitle="Log portfolio value"
+              signed={false}
+              amountLabel="Portfolio value (S$)"
+              showNote={false}
+            />
+          </div>
         )}
+
         {!hasAny && (
           <p className="py-2 text-sm text-muted-foreground">
             You&apos;re all caught up.

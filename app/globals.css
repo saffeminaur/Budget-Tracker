@@ -43,6 +43,8 @@
   --color-strong: var(--strong);
   --color-strong-foreground: var(--strong-foreground);
   --color-strong-accent: var(--strong-accent);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -93,6 +95,12 @@
   --strong: var(--foreground);
   --strong-foreground: var(--background);
   --strong-accent: var(--primary);
+  /* Unresolved-reminder urgency accent — deliberately not lime, since
+     lime reads as "positive" everywhere else (Investments, growth,
+     primary buttons). Only ever used as a border/wash, never as text
+     color, so it doesn't need to flip between light/dark. */
+  --warning: #e8a33d;
+  --warning-foreground: #141414;
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont,
     "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -137,6 +145,8 @@
   --strong: var(--primary);
   --strong-foreground: #141414;
   --strong-accent: #141414;
+  --warning: #e8a33d;
+  --warning-foreground: #141414;
 }
 
 @layer base {

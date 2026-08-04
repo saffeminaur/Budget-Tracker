@@ -12,6 +12,10 @@ import { formatMonthYear, todayIsoDate } from "@/lib/utils";
 interface MendakiReminderBannerProps {
   dueForMonth: Date;
   defaultAmount?: number;
+  // Renders without its own Card wrapper — for embedding inside another
+  // card (the dashboard's Reminders card) that already supplies the
+  // surrounding chrome/urgency styling.
+  bare?: boolean;
 }
 
 // No dismiss action on purpose: visibility is entirely driven by whether a
@@ -21,6 +25,7 @@ interface MendakiReminderBannerProps {
 export function MendakiReminderBanner({
   dueForMonth,
   defaultAmount = 50,
+  bare = false,
 }: MendakiReminderBannerProps) {
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -38,52 +43,60 @@ export function MendakiReminderBanner({
     }
   }
 
-  return (
-    <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
-      <CardContent className="space-y-3">
-        <p className="text-sm font-medium">
-          Loan repayment due for {formatMonthYear(dueForMonth)}
-        </p>
+  const body = (
+    <>
+      <p className="text-sm font-medium">
+        Loan repayment due for {formatMonthYear(dueForMonth)}
+      </p>
 
-        {!confirming ? (
-          <Button type="button" size="sm" onClick={() => setConfirming(true)}>
-            Yes, I paid
-          </Button>
-        ) : (
-          <form action={handleConfirm} className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="reminder-amount" className="text-xs">
-                  Amount (S$)
-                </Label>
-                <AmountInput
-                  id="reminder-amount"
-                  name="amount"
-                  defaultValue={defaultAmount}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="reminder-date" className="text-xs">
-                  Date
-                </Label>
-                <Input
-                  id="reminder-date"
-                  name="entry_date"
-                  type="date"
-                  defaultValue={todayIsoDate()}
-                  required
-                />
-              </div>
+      {!confirming ? (
+        <Button type="button" size="sm" onClick={() => setConfirming(true)}>
+          Yes, I paid
+        </Button>
+      ) : (
+        <form action={handleConfirm} className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="reminder-amount" className="text-xs">
+                Amount (S$)
+              </Label>
+              <AmountInput
+                id="reminder-amount"
+                name="amount"
+                defaultValue={defaultAmount}
+                required
+              />
             </div>
-            <input type="hidden" name="note" value="" />
-            {error && <p className="text-xs text-destructive">{error}</p>}
-            <Button type="submit" size="sm" disabled={submitting}>
-              {submitting ? "Saving…" : "Confirm payment"}
-            </Button>
-          </form>
-        )}
-      </CardContent>
+            <div className="space-y-1">
+              <Label htmlFor="reminder-date" className="text-xs">
+                Date
+              </Label>
+              <Input
+                id="reminder-date"
+                name="entry_date"
+                type="date"
+                defaultValue={todayIsoDate()}
+                required
+              />
+            </div>
+          </div>
+          <input type="hidden" name="note" value="" />
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <Button type="submit" size="sm" disabled={submitting}>
+            {submitting ? "Saving…" : "Confirm payment"}
+          </Button>
+        </form>
+      )}
+    </>
+  );
+
+  if (bare) {
+    return <div className="space-y-3">{body}</div>;
+  }
+
+  return (
+    <Card className="border-warning/50 bg-warning/10">
+      <CardContent className="space-y-3">{body}</CardContent>
     </Card>
   );
 }

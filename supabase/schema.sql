@@ -17,17 +17,29 @@ create table if not exists public.maribank_entries (
 );
 
 -- ============================================================
--- 2. DBS (daily spending) — signed entries with a category
+-- 2. DBS (daily spending) — signed entries; Expenses carry a category,
+--    Income entries (e.g. salary) leave category null
 -- ============================================================
 create table if not exists public.dbs_entries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   amount numeric(12, 2) not null,
-  category text not null check (category in ('Food', 'Transport', 'Shopping', 'Bills', 'Other')),
+  category text check (category in ('Food', 'Transport', 'Shopping', 'Bills', 'Other')),
   note text,
   entry_date date not null default current_date,
+  -- Expenses only. Lets a one-off purchase be excluded from monthly budget
+  -- totals/stats without excluding it from the account balance.
+  counts_toward_budget boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+-- Migration for databases created before Income/Expense typing was added
+-- (category used to be required on every row). Safe to re-run.
+alter table public.dbs_entries alter column category drop not null;
+
+-- Migration for databases created before per-expense budget opt-out was
+-- added. Safe to re-run.
+alter table public.dbs_entries add column if not exists counts_toward_budget boolean not null default true;
 
 -- ============================================================
 -- 3. Receivables — money others owe me, tracked per person

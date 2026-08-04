@@ -1,4 +1,4 @@
-// Generates PWA icons from a hand-authored SVG source into public/icons/.
+// Generates PWA icons from hand-authored SVG sources into public/icons/.
 // Run with: node scripts/generate-icons.mjs
 import sharp from "sharp";
 import { mkdir } from "node:fs/promises";
@@ -9,52 +9,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(__dirname, "..", "public", "icons");
 
 const BG = "#141414";
-const FG = "#d4f24e";
 
-// A geometric, single-color piggy-bank silhouette (flat shapes, not a
-// cartoon mascot) — body + snout as one merged mass, a pointed ear, four
-// short stub legs, and a small tail curl, all in FG. Eye/nostrils/coin
-// slot are cut in as BG-colored accents for a clean two-tone fintech-icon
-// look. Deliberately kept inside a generous safe zone (content spans
-// roughly the center 55% of the 512 canvas) so it survives the maskable
-// mask and still reads clearly at 180/192px.
+// Lucide "piggy-bank" glyph paths (24x24 viewBox), scaled + centered so the
+// glyph sits well inside the maskable "safe zone" (central ~80%) at every size.
 const GLYPH = `
-  <g>
-    <!-- tail curl -->
-    <path d="M 106 242 A 20 20 0 1 1 140 268" fill="none" stroke="${FG}"
-      stroke-width="16" stroke-linecap="round" />
-
-    <!-- ear -->
-    <polygon points="150,210 192,150 232,204" fill="${FG}" />
-
-    <!-- body + snout (single merged silhouette) -->
-    <ellipse cx="246" cy="272" rx="108" ry="76" fill="${FG}" />
-    <rect x="336" y="244" width="60" height="54" rx="18" fill="${FG}" />
-
-    <!-- legs -->
-    <rect x="156" y="338" width="38" height="56" rx="12" fill="${FG}" />
-    <rect x="220" y="338" width="38" height="56" rx="12" fill="${FG}" />
-    <rect x="284" y="338" width="38" height="56" rx="12" fill="${FG}" />
-    <rect x="346" y="338" width="38" height="56" rx="12" fill="${FG}" />
-
-    <!-- coin slot -->
-    <rect x="234" y="212" width="64" height="16" rx="8" fill="${BG}" />
-
-    <!-- eye -->
-    <circle cx="328" cy="248" r="9" fill="${BG}" />
-
-    <!-- nostrils -->
-    <circle cx="380" cy="258" r="6" fill="${BG}" />
-    <circle cx="380" cy="284" r="6" fill="${BG}" />
+  <g transform="translate(124,124) scale(11)" fill="none" stroke="#d4f24e"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z" />
+    <path d="M16 10h.01" />
+    <path d="M2 8v1a2 2 0 0 0 2 2h1" />
   </g>
 `;
 
-// Rounded-square background — used for the standard "any" purpose manifest
-// icons (most Android launchers apply their own mask anyway, but this looks
-// right anywhere that doesn't).
+// Rounded background — used for the standard "any" purpose manifest icons.
 const roundedSvg = `
   <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-    <rect width="512" height="512" rx="112" fill="${BG}" />
+    <rect width="512" height="512" rx="96" fill="${BG}" />
     ${GLYPH}
   </svg>
 `;

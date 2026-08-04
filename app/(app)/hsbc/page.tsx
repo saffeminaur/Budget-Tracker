@@ -2,24 +2,42 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 import {
   addHsbcContribution,
   deleteHsbcContribution,
+  updateHsbcContribution,
   addHsbcValuation,
   deleteHsbcValuation,
+  updateHsbcValuation,
 } from "@/actions/hsbc";
 import { EntryForm } from "@/components/entry-form";
 import { EntryList } from "@/components/entry-list";
+import { SearchableEntryList } from "@/components/searchable-entry-list";
 import { HsbcValuationSection } from "@/components/hsbc-valuation-section";
+import { DateRangeFilter } from "@/components/date-range-filter";
+import { AccountHeader } from "@/components/account-header";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { formatCurrency, isSameMonth, sum } from "@/lib/utils";
+import {
+  formatCurrency,
+  isSameMonth,
+  isWithinDateRange,
+  parseRangeSearchParams,
+  sum,
+  type PageSearchParams,
+} from "@/lib/utils";
 import type { HsbcContribution, HsbcValuation } from "@/lib/types";
+import { ACCOUNT_LABELS } from "@/lib/account-labels";
 
-export default async function HsbcPage() {
+export default async function HsbcPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireUser();
   const supabase = await createClient();
+  const { range, custom } = parseRangeSearchParams(await searchParams);
 
   const [{ data: contributionsData }, { data: valuationsData }] =
     await Promise.all([
@@ -44,20 +62,31 @@ export default async function HsbcPage() {
   const growthPct =
     totalContributed > 0 ? (growth / totalContributed) * 100 : 0;
 
+  // The reminder always checks the true current month, independent of the
+  // page's date-range filter below.
   const now = new Date();
   const valuedThisMonth = valuations.some((v) => isSameMonth(v.entry_date, now));
 
+  const filteredContributions = contributions.filter((c) =>
+    isWithinDateRange(c.entry_date, range, now, custom)
+  );
+  const filteredValuations = valuations.filter((v) =>
+    isWithinDateRange(v.entry_date, range, now, custom)
+  );
+
   return (
     <div className="mx-auto max-w-lg space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <AccountHeader primary={ACCOUNT_LABELS.hsbc.primary} tag={ACCOUNT_LABELS.hsbc.tag} />
+
+      <div className="grid grid-cols-3 gap-3">
         <Card>
           <CardHeader>
             <CardTitle className="text-xs font-medium text-muted-foreground">
-              Total contributed
+              Contributed
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold">
+            <p className="text-lg font-semibold">
               {formatCurrency(totalContributed)}
             </p>
           </CardContent>
@@ -69,54 +98,53 @@ export default async function HsbcPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold">
+            <p className="text-lg font-semibold">
               {formatCurrency(currentValue)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-foreground bg-foreground text-background">
+          <CardHeader>
+            <CardTitle className="text-xs font-medium text-background/70">
+              Growth
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold text-primary">
+              {growth >= 0 ? "+" : ""}
+              {growthPct.toFixed(1)}%
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Growth / return
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p
-            className={
-              growth < 0
-                ? "text-2xl font-semibold text-destructive"
-                : "text-2xl font-semibold text-emerald-600 dark:text-emerald-500"
-            }
-          >
-            {growth >= 0 ? "+" : ""}
-            {formatCurrency(growth)}{" "}
-            <span className="text-base font-normal">
-              ({growth >= 0 ? "+" : ""}
-              {growthPct.toFixed(1)}%)
-            </span>
-          </p>
-        </CardContent>
-      </Card>
+      <DateRangeFilter
+        current={range}
+        basePath="/hsbc"
+        customFrom={custom.from}
+        customTo={custom.to}
+      />
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Contributions</h2>
         <EntryForm
           action={addHsbcContribution}
           triggerLabel="Add"
-          dialogTitle="Add HSBC contribution"
+          dialogTitle={`Add ${ACCOUNT_LABELS.hsbc.primary} contribution`}
           signed={false}
           amountLabel="Amount added (S$)"
         />
       </div>
       <Card>
         <CardContent className="px-4">
-          <EntryList
-            entries={contributions}
+          <SearchableEntryList
+            entries={filteredContributions}
             deleteAction={deleteHsbcContribution}
+            updateAction={updateHsbcContribution}
             showSign={false}
-            emptyMessage="No contributions logged yet."
+            emptyMessage="No contributions in this period."
+            editDialogTitle={`Edit ${ACCOUNT_LABELS.hsbc.primary} contribution`}
+            editAmountLabel="Amount added (S$)"
           />
         </CardContent>
       </Card>
@@ -129,14 +157,18 @@ export default async function HsbcPage() {
       <Card>
         <CardContent className="px-4">
           <EntryList
-            entries={valuations.map((v) => ({
+            entries={filteredValuations.map((v) => ({
               id: v.id,
               amount: v.value,
               entry_date: v.entry_date,
             }))}
             deleteAction={deleteHsbcValuation}
+            updateAction={updateHsbcValuation}
             showSign={false}
-            emptyMessage="No valuations logged yet."
+            emptyMessage="No valuations in this period."
+            editDialogTitle="Edit portfolio value"
+            editAmountLabel="Portfolio value (S$)"
+            editShowNote={false}
           />
         </CardContent>
       </Card>

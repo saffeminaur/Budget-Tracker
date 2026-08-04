@@ -2,11 +2,14 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 import {
   addMendakiRepayment,
   deleteMendakiRepayment,
+  updateMendakiRepayment,
 } from "@/actions/mendaki";
 import { EntryForm } from "@/components/entry-form";
-import { EntryList } from "@/components/entry-list";
+import { SearchableEntryList } from "@/components/searchable-entry-list";
 import { SetLoanTotalDialog } from "@/components/set-loan-total-dialog";
 import { MendakiReminderBanner } from "@/components/mendaki-reminder-banner";
+import { DateRangeFilter } from "@/components/date-range-filter";
+import { AccountHeader } from "@/components/account-header";
 import {
   Card,
   CardAction,
@@ -18,13 +21,22 @@ import {
   firstOfPreviousMonthIsoDate,
   formatCurrency,
   isSameMonth,
+  isWithinDateRange,
+  parseRangeSearchParams,
   sum,
+  type PageSearchParams,
 } from "@/lib/utils";
+import { ACCOUNT_LABELS } from "@/lib/account-labels";
 import type { MendakiLoan, MendakiRepayment } from "@/lib/types";
 
-export default async function MendakiPage() {
+export default async function MendakiPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireUser();
   const supabase = await createClient();
+  const { range, custom } = parseRangeSearchParams(await searchParams);
 
   const [{ data: loanData }, { data: repaymentsData }] = await Promise.all([
     supabase.from("mendaki_loan").select("*").maybeSingle(),
@@ -42,12 +54,23 @@ export default async function MendakiPage() {
   const totalRepaid = sum(repayments.map((r) => r.amount));
   const remaining = totalAmount - totalRepaid;
 
+  // Always checks the true current month, independent of the page's
+  // date-range filter below.
   const now = new Date();
   const paidThisMonth = repayments.some((r) => isSameMonth(r.entry_date, now));
   const showReminder = totalAmount > 0 && remaining > 0 && !paidThisMonth;
 
+  const filteredRepayments = repayments.filter((r) =>
+    isWithinDateRange(r.entry_date, range, now, custom)
+  );
+
   return (
     <div className="mx-auto max-w-lg space-y-4">
+      <AccountHeader
+        primary={ACCOUNT_LABELS.mendaki.primary}
+        tag={ACCOUNT_LABELS.mendaki.tag}
+      />
+
       {showReminder && <MendakiReminderBanner dueForMonth={now} />}
 
       <Card>
@@ -110,13 +133,22 @@ export default async function MendakiPage() {
         above. Use &ldquo;Log a past payment&rdquo; to backfill repayments
         from before you started using this app.
       </p>
+      <DateRangeFilter
+        current={range}
+        basePath="/mendaki"
+        customFrom={custom.from}
+        customTo={custom.to}
+      />
+
       <Card>
         <CardContent className="px-4">
-          <EntryList
-            entries={repayments}
+          <SearchableEntryList
+            entries={filteredRepayments}
             deleteAction={deleteMendakiRepayment}
+            updateAction={updateMendakiRepayment}
             showSign={false}
-            emptyMessage="No repayments logged yet."
+            emptyMessage="No repayments in this period."
+            editDialogTitle="Edit repayment"
           />
         </CardContent>
       </Card>

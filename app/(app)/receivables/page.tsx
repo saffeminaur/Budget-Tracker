@@ -2,9 +2,11 @@ import { createClient, requireUser } from "@/lib/supabase/server";
 import {
   addReceivableEntry,
   deleteReceivableEntry,
+  updateReceivableEntry,
 } from "@/actions/receivables";
 import { EntryForm } from "@/components/entry-form";
-import { EntryList } from "@/components/entry-list";
+import { SearchableEntryList } from "@/components/searchable-entry-list";
+import { DateRangeFilter } from "@/components/date-range-filter";
 import {
   Card,
   CardContent,
@@ -13,12 +15,23 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatCurrency, sum } from "@/lib/utils";
+import {
+  formatCurrency,
+  isWithinDateRange,
+  parseRangeSearchParams,
+  sum,
+  type PageSearchParams,
+} from "@/lib/utils";
 import type { ReceivableEntry } from "@/lib/types";
 
-export default async function ReceivablesPage() {
+export default async function ReceivablesPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireUser();
   const supabase = await createClient();
+  const { range, custom } = parseRangeSearchParams(await searchParams);
 
   const { data } = await supabase
     .from("receivables_entries")
@@ -28,6 +41,9 @@ export default async function ReceivablesPage() {
 
   const entries = (data ?? []) as ReceivableEntry[];
   const total = sum(entries.map((e) => e.amount));
+  const filteredEntries = entries.filter((e) =>
+    isWithinDateRange(e.entry_date, range, new Date(), custom)
+  );
 
   const byPerson = new Map<string, number>();
   for (const entry of entries) {
@@ -68,7 +84,7 @@ export default async function ReceivablesPage() {
                     className={
                       amount < 0
                         ? "text-destructive"
-                        : "text-emerald-600 dark:text-emerald-500"
+                        : "text-success"
                     }
                   >
                     {formatCurrency(amount)}
@@ -104,11 +120,26 @@ export default async function ReceivablesPage() {
         />
       </div>
 
+      <DateRangeFilter
+        current={range}
+        basePath="/receivables"
+        customFrom={custom.from}
+        customTo={custom.to}
+      />
+
       <Card>
         <CardContent className="px-4">
-          <EntryList
-            entries={entries.map((e) => ({ ...e, badge: e.person }))}
+          <SearchableEntryList
+            entries={filteredEntries.map((e) => ({ ...e, badge: e.person }))}
+            searchFields={["note", "badge"]}
+            searchPlaceholder="Search notes or person…"
             deleteAction={deleteReceivableEntry}
+            updateAction={updateReceivableEntry}
+            editDialogTitle="Edit receivable entry"
+            editPositiveLabel="I paid for them"
+            editNegativeLabel="They paid me back"
+            editExtraField="person"
+            emptyMessage="No entries in this period."
           />
         </CardContent>
       </Card>

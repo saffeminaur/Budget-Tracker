@@ -1,8 +1,9 @@
 import { createClient, requireUser } from "@/lib/supabase/server";
-import { addDbsEntry, deleteDbsEntry } from "@/actions/dbs";
+import { addDbsEntry, deleteDbsEntry, updateDbsEntry } from "@/actions/dbs";
 import { EntryForm } from "@/components/entry-form";
-import { EntryList } from "@/components/entry-list";
-import { CategoryBreakdownChart } from "@/components/category-breakdown-chart";
+import { SearchableEntryList } from "@/components/searchable-entry-list";
+import { DateRangeFilter } from "@/components/date-range-filter";
+import { AccountHeader } from "@/components/account-header";
 import {
   Card,
   CardContent,
@@ -17,12 +18,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency, sum } from "@/lib/utils";
-import { CATEGORIES, type Category, type DbsEntry } from "@/lib/types";
+import { Switch } from "@/components/ui/switch";
+import {
+  formatCurrency,
+  isWithinDateRange,
+  parseRangeSearchParams,
+  sum,
+  type PageSearchParams,
+} from "@/lib/utils";
+import { CATEGORIES, type DbsEntry } from "@/lib/types";
+import { ACCOUNT_LABELS } from "@/lib/account-labels";
 
-export default async function DbsPage() {
+export default async function DbsPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   await requireUser();
   const supabase = await createClient();
+  const { range, custom } = parseRangeSearchParams(await searchParams);
 
   const { data } = await supabase
     .from("dbs_entries")
@@ -32,34 +46,22 @@ export default async function DbsPage() {
 
   const entries = (data ?? []) as DbsEntry[];
   const balance = sum(entries.map((e) => e.amount));
-
-  const categoryTotals: Partial<Record<Category, number>> = {};
-  for (const entry of entries) {
-    if (entry.amount < 0) {
-      categoryTotals[entry.category] =
-        (categoryTotals[entry.category] ?? 0) + Math.abs(entry.amount);
-    }
-  }
+  const filteredEntries = entries.filter((e) =>
+    isWithinDateRange(e.entry_date, range, new Date(), custom)
+  );
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
+      <AccountHeader primary={ACCOUNT_LABELS.dbs.primary} tag={ACCOUNT_LABELS.dbs.tag} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            DBS balance
+            Balance
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-semibold">{formatCurrency(balance)}</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Spending by category</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CategoryBreakdownChart totals={categoryTotals} />
         </CardContent>
       </Card>
 
@@ -68,34 +70,66 @@ export default async function DbsPage() {
         <EntryForm
           action={addDbsEntry}
           triggerLabel="Add entry"
-          dialogTitle="Add DBS entry"
-          positiveLabel="Add"
-          negativeLabel="Spend"
+          dialogTitle={`Add ${ACCOUNT_LABELS.dbs.primary} entry`}
+          positiveLabel="Income"
+          negativeLabel="Expense"
+          defaultSign={-1}
+          extraFieldForSign={-1}
           extraField={
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select name="category" defaultValue={CATEGORIES[0]} required>
-                <SelectTrigger id="category" className="w-full">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <Select name="category" defaultValue={CATEGORIES[0]} required>
+                  <SelectTrigger id="category" className="w-full">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between gap-2 rounded-md border p-3">
+                <Label htmlFor="counts_toward_budget" className="text-sm font-normal">
+                  Count towards monthly budget
+                </Label>
+                <Switch
+                  id="counts_toward_budget"
+                  name="counts_toward_budget"
+                  defaultChecked
+                />
+              </div>
+            </>
           }
         />
       </div>
 
+      <DateRangeFilter
+        current={range}
+        basePath="/dbs"
+        customFrom={custom.from}
+        customTo={custom.to}
+      />
+
       <Card>
         <CardContent className="px-4">
-          <EntryList
-            entries={entries.map((e) => ({ ...e, badge: e.category }))}
+          <SearchableEntryList
+            entries={filteredEntries.map((e) => ({
+              ...e,
+              badge: e.category ?? "Income",
+              countsTowardBudget: e.category ? e.counts_toward_budget : undefined,
+            }))}
             deleteAction={deleteDbsEntry}
+            updateAction={updateDbsEntry}
+            editDialogTitle={`Edit ${ACCOUNT_LABELS.dbs.primary} entry`}
+            editPositiveLabel="Income"
+            editNegativeLabel="Expense"
+            editExtraField="category"
+            editExtraFieldForSign={-1}
+            emptyMessage="No entries in this period."
           />
         </CardContent>
       </Card>

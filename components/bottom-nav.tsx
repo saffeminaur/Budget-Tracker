@@ -11,14 +11,15 @@ import {
   Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ACCOUNT_LABELS } from "@/lib/account-labels";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: LayoutDashboard },
-  { href: "/maribank", label: "MariBank", icon: PiggyBank },
-  { href: "/dbs", label: "DBS", icon: Wallet },
+  { href: "/maribank", label: ACCOUNT_LABELS.maribank.primary, icon: PiggyBank },
+  { href: "/dbs", label: ACCOUNT_LABELS.dbs.primary, icon: Wallet },
   { href: "/receivables", label: "Owed", icon: Users },
-  { href: "/hsbc", label: "HSBC", icon: TrendingUp },
-  { href: "/mendaki", label: "Mendaki", icon: Landmark },
+  { href: "/hsbc", label: ACCOUNT_LABELS.hsbc.primary, icon: TrendingUp },
+  { href: "/mendaki", label: ACCOUNT_LABELS.mendaki.primary, icon: Landmark },
 ];
 
 export function BottomNav() {
@@ -36,11 +37,18 @@ export function BottomNav() {
                 className={cn(
                   "flex flex-col items-center gap-1 py-2 text-[11px] font-medium transition-colors",
                   active
-                    ? "text-primary"
+                    ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Icon className="size-5" />
+                <span
+                  className={cn(
+                    "flex size-7 items-center justify-center rounded-full transition-colors",
+                    active && "bg-primary"
+                  )}
+                >
+                  <Icon className="size-4.5" />
+                </span>
                 <span>{label}</span>
               </Link>
             </li>

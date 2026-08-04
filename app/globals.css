@@ -39,6 +39,7 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-success: var(--success);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,38 +50,40 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* Femina Budget Tracker brand: cream / near-black ink / lime accent. */
+  --background: #f4f3ed;
+  --foreground: #141414;
+  --card: #ffffff;
+  --card-foreground: #141414;
+  --popover: #ffffff;
+  --popover-foreground: #141414;
+  --primary: #d4f24e;
+  --primary-foreground: #141414;
+  --secondary: #ececdf;
+  --secondary-foreground: #141414;
+  --muted: #ececdf;
+  --muted-foreground: #6b6b66;
+  --accent: #ececdf;
+  --accent-foreground: #141414;
+  --destructive: #b5504a;
+  --success: #3f8f5f;
+  --border: #141414;
+  --input: #141414;
+  --ring: #d4f24e;
+  --chart-1: #d4f24e;
+  --chart-2: #6b6b66;
+  --chart-3: #3f8f5f;
+  --chart-4: #b5504a;
+  --chart-5: #141414;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #141414;
+  --sidebar-primary: #d4f24e;
+  --sidebar-primary-foreground: #141414;
+  --sidebar-accent: #ececdf;
+  --sidebar-accent-foreground: #141414;
+  --sidebar-border: #141414;
+  --sidebar-ring: #d4f24e;
 }
 
 .dark {
@@ -129,22 +132,48 @@
   }
 }
 
-/* Fixed categorical palette for the DBS category breakdown chart.
-   Color is assigned by category identity, never by rank, so each
-   category keeps its hue regardless of which categories are present. */
+/* Spending charts: brand-forward two-tone bars (lime / ink black) instead
+   of a five-hue categorical palette — a deliberate simplification, with
+   identity carried by the direct labels each chart already renders next
+   to every bar/segment (category name, legend, tooltip), not by hue.
+   Alternates by fixed category position, so a given category always
+   keeps the same color regardless of which others are present. Lime
+   fills get a black stroke (see chart components) since a flat lime fill
+   reads poorly against the white card without it. */
 .category-chart {
-  --cat-food: #2a78d6;
-  --cat-transport: #eb6834;
-  --cat-shopping: #1baf7a;
-  --cat-bills: #eda100;
-  --cat-other: #e87ba4;
+  --cat-food: #d4f24e;
+  --cat-transport: #141414;
+  --cat-shopping: #d4f24e;
+  --cat-bills: #141414;
+  --cat-other: #d4f24e;
+  --cat-grid: #e0ded6;
 }
 @media (prefers-color-scheme: dark) {
   .category-chart {
-    --cat-food: #3987e5;
-    --cat-transport: #d95926;
-    --cat-shopping: #199e70;
-    --cat-bills: #c98500;
-    --cat-other: #d55181;
+    --cat-food: #d4f24e;
+    --cat-transport: #8f8f88;
+    --cat-shopping: #d4f24e;
+    --cat-bills: #8f8f88;
+    --cat-other: #d4f24e;
+    --cat-grid: #3a3a35;
+  }
+}
+
+/* Investments portfolio trend chart: accent line (portfolio value) vs. the
+   de-emphasis light gray (total contributed) — the "emphasis" color job,
+   one hue + gray, not a categorical pair. Ink black line for contrast on
+   the white card, lime for the current-point marker/pill accent. */
+.portfolio-chart {
+  --line-value: #141414;
+  --line-value-dot: #d4f24e;
+  --line-muted: #c7c7be;
+  --port-grid: #e0ded6;
+}
+@media (prefers-color-scheme: dark) {
+  .portfolio-chart {
+    --line-value: #d4f24e;
+    --line-value-dot: #d4f24e;
+    --line-muted: #5a5a54;
+    --port-grid: #3a3a35;
   }
 }

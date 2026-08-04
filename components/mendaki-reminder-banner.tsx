@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { addMendakiRepayment } from "@/actions/mendaki";
 import { Button } from "@/components/ui/button";
+import { AmountInput } from "@/components/amount-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,11 +24,15 @@ export function MendakiReminderBanner({
 }: MendakiReminderBannerProps) {
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleConfirm(formData: FormData) {
     setSubmitting(true);
+    setError(null);
     try {
       await addMendakiRepayment(formData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -37,7 +42,7 @@ export function MendakiReminderBanner({
     <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
       <CardContent className="space-y-3">
         <p className="text-sm font-medium">
-          Mendaki repayment due for {formatMonthYear(dueForMonth)}
+          Loan repayment due for {formatMonthYear(dueForMonth)}
         </p>
 
         {!confirming ? (
@@ -51,13 +56,9 @@ export function MendakiReminderBanner({
                 <Label htmlFor="reminder-amount" className="text-xs">
                   Amount (S$)
                 </Label>
-                <Input
+                <AmountInput
                   id="reminder-amount"
                   name="amount"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0.01"
                   defaultValue={defaultAmount}
                   required
                 />
@@ -76,6 +77,7 @@ export function MendakiReminderBanner({
               </div>
             </div>
             <input type="hidden" name="note" value="" />
+            {error && <p className="text-xs text-destructive">{error}</p>}
             <Button type="submit" size="sm" disabled={submitting}>
               {submitting ? "Saving…" : "Confirm payment"}
             </Button>

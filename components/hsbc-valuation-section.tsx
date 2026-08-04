@@ -34,6 +34,7 @@ export function HsbcValuationSection({
           dialogTitle="Log portfolio value"
           signed={false}
           amountLabel="Portfolio value (S$)"
+          showNote={false}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
         />

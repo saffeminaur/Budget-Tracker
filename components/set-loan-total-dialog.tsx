@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { setMendakiLoanTotal } from "@/actions/mendaki";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AmountInput } from "@/components/amount-input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -17,12 +17,16 @@ import { Pencil } from "lucide-react";
 export function SetLoanTotalDialog({ currentTotal }: { currentTotal: number }) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleAction(formData: FormData) {
     setSubmitting(true);
+    setError(null);
     try {
       await setMendakiLoanTotal(formData);
       setOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
       setSubmitting(false);
     }
@@ -42,17 +46,14 @@ export function SetLoanTotalDialog({ currentTotal }: { currentTotal: number }) {
         <form action={handleAction} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="total_amount">Total amount loaned (S$)</Label>
-            <Input
+            <AmountInput
               id="total_amount"
               name="total_amount"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0"
               defaultValue={currentTotal}
               required
             />
           </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? "Saving…" : "Save"}
           </Button>

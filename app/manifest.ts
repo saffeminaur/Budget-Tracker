@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "Personal budget tracker: savings, spending, receivables, investments and loans.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0f172a",
-    theme_color: "#0f172a",
+    background_color: "#141414",
+    theme_color: "#141414",
     icons: [
       {
         src: "/icons/icon-192.png",

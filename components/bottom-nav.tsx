@@ -47,7 +47,9 @@ export function BottomNav() {
                     active && "bg-primary"
                   )}
                 >
-                  <Icon className="size-4.5" />
+                  <Icon
+                    className={cn("size-4.5", active && "text-primary-foreground")}
+                  />
                 </span>
                 <span>{label}</span>
               </Link>

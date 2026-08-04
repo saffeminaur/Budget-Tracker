@@ -11,8 +11,9 @@ interface AccountSummaryCardProps {
   amount: number;
   icon: LucideIcon;
   sublabel?: string;
-  // Dark ink card with a lime value — used to make one tile (Investments)
-  // stand out from the rest of the row.
+  // "Strong" accent card (ink+lime in light mode, inverted to lime+ink in
+  // dark mode) — used to make one tile (Investments) stand out from the
+  // rest of the row.
   highlight?: boolean;
 }
 
@@ -31,7 +32,7 @@ export function AccountSummaryCard({
         className={cn(
           "h-full transition-colors",
           highlight
-            ? "border-foreground bg-foreground text-background hover:bg-foreground/90"
+            ? "border-strong bg-strong text-strong-foreground hover:bg-strong/90"
             : "hover:bg-accent/50"
         )}
       >
@@ -39,7 +40,7 @@ export function AccountSummaryCard({
           <CardTitle
             className={cn(
               "flex items-center gap-1.5 text-xs font-medium",
-              highlight ? "text-background/70" : "text-muted-foreground"
+              highlight ? "text-strong-foreground/70" : "text-muted-foreground"
             )}
           >
             <Icon className="size-4" />
@@ -50,7 +51,7 @@ export function AccountSummaryCard({
                 className={cn(
                   "h-4 px-1 text-[9px] font-normal",
                   highlight
-                    ? "border-background/30 text-background/70"
+                    ? "border-strong-foreground/30 text-strong-foreground/70"
                     : "text-muted-foreground"
                 )}
               >
@@ -63,7 +64,7 @@ export function AccountSummaryCard({
           <p
             className={cn(
               "text-xl font-semibold",
-              highlight && "text-primary"
+              highlight && "text-strong-accent"
             )}
           >
             {formatCurrency(amount)}
@@ -72,7 +73,7 @@ export function AccountSummaryCard({
             <p
               className={cn(
                 "text-xs",
-                highlight ? "text-background/70" : "text-muted-foreground"
+                highlight ? "text-strong-foreground/70" : "text-muted-foreground"
               )}
             >
               {sublabel}

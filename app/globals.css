@@ -8,7 +8,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -40,6 +40,9 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-success: var(--success);
+  --color-strong: var(--strong);
+  --color-strong-foreground: var(--strong-foreground);
+  --color-strong-accent: var(--strong-accent);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -84,45 +87,68 @@
   --sidebar-accent-foreground: #141414;
   --sidebar-border: #141414;
   --sidebar-ring: #d4f24e;
+  /* "Strong" surface: an always-bold, always-high-contrast accent block —
+     ink-black-and-lime in light mode. Used for the Investments summary
+     tile and active segmented-control pills. */
+  --strong: var(--foreground);
+  --strong-foreground: var(--background);
+  --strong-accent: var(--primary);
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont,
+    "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0d0d0d;
+  --foreground: #f4f3ed;
+  --card: #1a1a1a;
+  --card-foreground: #f4f3ed;
+  --popover: #1a1a1a;
+  --popover-foreground: #f4f3ed;
+  --primary: #d4f24e;
+  --primary-foreground: #141414;
+  --secondary: #242424;
+  --secondary-foreground: #f4f3ed;
+  --muted: #202020;
+  --muted-foreground: #8a8a85;
+  --accent: #242424;
+  --accent-foreground: #f4f3ed;
+  --destructive: #d97373;
+  --success: #7fc97f;
+  --border: #2a2a2a;
+  --input: #2a2a2a;
+  --ring: #d4f24e;
+  --chart-1: #d4f24e;
+  --chart-2: #8a8a85;
+  --chart-3: #7fc97f;
+  --chart-4: #d97373;
+  --chart-5: #f4f3ed;
+  --sidebar: #1a1a1a;
+  --sidebar-foreground: #f4f3ed;
+  --sidebar-primary: #d4f24e;
+  --sidebar-primary-foreground: #141414;
+  --sidebar-accent: #242424;
+  --sidebar-accent-foreground: #f4f3ed;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #d4f24e;
+  /* Inverted from light mode: black wouldn't stand out against an already
+     dark page, so the "strong" surface becomes the lime accent itself,
+     with dark text on top. */
+  --strong: var(--primary);
+  --strong-foreground: #141414;
+  --strong-accent: #141414;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    transition: background-color 200ms ease, border-color 200ms ease,
+      color 200ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none;
+    }
   }
   body {
     @apply bg-background text-foreground;
@@ -132,14 +158,14 @@
   }
 }
 
-/* Spending charts: brand-forward two-tone bars (lime / ink black) instead
-   of a five-hue categorical palette — a deliberate simplification, with
+/* Spending charts: brand-forward two-tone bars (lime / ink) instead of a
+   five-hue categorical palette — a deliberate simplification, with
    identity carried by the direct labels each chart already renders next
    to every bar/segment (category name, legend, tooltip), not by hue.
    Alternates by fixed category position, so a given category always
    keeps the same color regardless of which others are present. Lime
-   fills get a black stroke (see chart components) since a flat lime fill
-   reads poorly against the white card without it. */
+   fills get a stroke outline (see chart components) since a flat lime
+   fill reads poorly against the card without it. */
 .category-chart {
   --cat-food: #d4f24e;
   --cat-transport: #141414;
@@ -148,32 +174,35 @@
   --cat-other: #d4f24e;
   --cat-grid: #e0ded6;
 }
-@media (prefers-color-scheme: dark) {
-  .category-chart {
-    --cat-food: #d4f24e;
-    --cat-transport: #8f8f88;
-    --cat-shopping: #d4f24e;
-    --cat-bills: #8f8f88;
-    --cat-other: #d4f24e;
-    --cat-grid: #3a3a35;
-  }
+.dark .category-chart {
+  /* "Ink" alternates to the dark-mode foreground (off-white) instead of
+     near-black, since near-black would vanish against the #1a1a1a card. */
+  --cat-food: #d4f24e;
+  --cat-transport: #f4f3ed;
+  --cat-shopping: #d4f24e;
+  --cat-bills: #f4f3ed;
+  --cat-other: #d4f24e;
+  --cat-grid: #2a2a2a;
 }
 
 /* Investments portfolio trend chart: accent line (portfolio value) vs. the
-   de-emphasis light gray (total contributed) — the "emphasis" color job,
-   one hue + gray, not a categorical pair. Ink black line for contrast on
-   the white card, lime for the current-point marker/pill accent. */
+   de-emphasis gray (total contributed) — the "emphasis" color job, one
+   hue + gray, not a categorical pair. Ink line for contrast on the light
+   card, lime for the current-point marker/pill accent; both flip in dark
+   mode since ink would vanish against the dark card. */
 .portfolio-chart {
   --line-value: #141414;
   --line-value-dot: #d4f24e;
   --line-muted: #c7c7be;
   --port-grid: #e0ded6;
+  --pin-bg: #141414;
+  --pin-fg: #ffffff;
 }
-@media (prefers-color-scheme: dark) {
-  .portfolio-chart {
-    --line-value: #d4f24e;
-    --line-value-dot: #d4f24e;
-    --line-muted: #5a5a54;
-    --port-grid: #3a3a35;
-  }
+.dark .portfolio-chart {
+  --line-value: #d4f24e;
+  --line-value-dot: #d4f24e;
+  --line-muted: #5a5a54;
+  --port-grid: #2a2a2a;
+  --pin-bg: #d4f24e;
+  --pin-fg: #141414;
 }

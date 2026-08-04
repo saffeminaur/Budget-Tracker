@@ -347,14 +347,14 @@ export default async function DashboardPage({
             </p>
           </CardContent>
         </Card>
-        <Card className="border-foreground bg-foreground text-background">
+        <Card className="border-strong bg-strong text-strong-foreground">
           <CardHeader>
-            <CardTitle className="text-xs font-medium text-background/70">
+            <CardTitle className="text-xs font-medium text-strong-foreground/70">
               Growth
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-semibold text-primary">
+            <p className="text-lg font-semibold text-strong-accent">
               {hsbcGrowth >= 0 ? "+" : ""}
               {hsbcGrowthPct.toFixed(1)}%
             </p>

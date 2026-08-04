@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { signOut } from "@/actions/auth";
 import { BottomNav } from "@/components/bottom-nav";
 import { UserBadge } from "@/components/user-badge";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
@@ -29,6 +30,7 @@ export default async function AppLayout({
             email={user.email ?? ""}
             hasCustomName={!!customName}
           />
+          <ThemeToggle />
           <form action={signOut}>
             <Button
               type="submit"

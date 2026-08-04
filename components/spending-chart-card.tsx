@@ -38,7 +38,7 @@ export function SpendingChartCard({
               className={cn(
                 "rounded-full px-2.5 py-1 font-medium transition-colors",
                 view === "category"
-                  ? "bg-foreground text-primary"
+                  ? "bg-strong text-strong-accent"
                   : "bg-card text-foreground hover:bg-muted"
               )}
             >
@@ -50,7 +50,7 @@ export function SpendingChartCard({
               className={cn(
                 "rounded-full px-2.5 py-1 font-medium transition-colors",
                 view === "trend"
-                  ? "bg-foreground text-primary"
+                  ? "bg-strong text-strong-accent"
                   : "bg-card text-foreground hover:bg-muted"
               )}
             >

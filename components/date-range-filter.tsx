@@ -52,7 +52,7 @@ export function DateRangeFilter({
             className={cn(
               "rounded-md px-3 py-1.5 font-medium transition-colors",
               current === option.value
-                ? "bg-foreground text-primary"
+                ? "bg-strong text-strong-accent"
                 : "bg-card text-foreground hover:bg-muted"
             )}
           >

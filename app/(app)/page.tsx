@@ -6,6 +6,7 @@ import { QuickAdd } from "@/components/quick-add";
 import { SpendingChartCard } from "@/components/spending-chart-card";
 import { RemindersCard } from "@/components/reminders-card";
 import { RecentTransactionsList } from "@/components/recent-transactions-list";
+import { DashboardSection } from "@/components/dashboard-section";
 import { DateRangeFilter } from "@/components/date-range-filter";
 import { GranularityFilter } from "@/components/granularity-filter";
 import {
@@ -254,57 +255,71 @@ export default async function DashboardPage({
         />
       </div>
 
-      <QuickAdd />
-
-      <DateRangeFilter
-        current={range}
-        basePath="/"
-        customFrom={custom.from}
-        customTo={custom.to}
-        preserveParams={{
-          granularity: granularity === "monthly" ? undefined : granularity,
-        }}
-      />
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <SpendingChartCard
-          periodLabel={dateRangeLabel(range, custom)}
-          periodIncome={periodIncome}
-          periodExpenses={periodExpenses}
-          categoryTotals={categoryTotals}
-          monthlyTrend={monthlyTrend}
-        />
+      {/* Mobile: only the essentials render eagerly (above); everything
+          else is progressive disclosure so the first screen is scannable
+          without a long scroll. Desktop keeps the original always-expanded
+          layout, unchanged, in the block below. */}
+      <div className="space-y-3 sm:hidden">
         <RemindersCard
           dueForMonth={now}
           showLoanReminder={showLoanReminder}
           showInvestmentsReminder={showInvestmentsReminder}
+          hideWhenEmpty
         />
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent transactions</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4">
+        <DashboardSection
+          title="Femina AI"
+          summary="Log a transaction with plain English"
+        >
+          <QuickAdd />
+        </DashboardSection>
+
+        <DashboardSection
+          title="Spending"
+          summary={`${dateRangeLabel(range, custom)} · ${formatCurrency(periodExpenses)}`}
+        >
+          <div className="space-y-4">
+            <DateRangeFilter
+              current={range}
+              basePath="/"
+              customFrom={custom.from}
+              customTo={custom.to}
+              preserveParams={{
+                granularity: granularity === "monthly" ? undefined : granularity,
+              }}
+            />
+            <SpendingChartCard
+              periodLabel={dateRangeLabel(range, custom)}
+              periodIncome={periodIncome}
+              periodExpenses={periodExpenses}
+              categoryTotals={categoryTotals}
+              monthlyTrend={monthlyTrend}
+            />
+          </div>
+        </DashboardSection>
+
+        <DashboardSection
+          title="Recent transactions"
+          summary={`${recentTransactions.length} recent`}
+        >
           <RecentTransactionsList entries={recentTransactions} />
-        </CardContent>
-        <div className="px-4 pb-4">
           <Link
             href="/dbs"
-            className="text-sm font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4 hover:decoration-4"
+            className="mt-4 block text-sm font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4 hover:decoration-4"
           >
             View {ACCOUNT_LABELS.dbs.primary} →
           </Link>
-        </div>
-      </Card>
+        </DashboardSection>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="min-w-0 truncate text-base">
-              {ACCOUNT_LABELS.hsbc.primary} · portfolio value
-            </CardTitle>
-            <div className="shrink-0">
+        <DashboardSection
+          title="Investments"
+          summary={`Current value · ${formatCurrency(hsbcCurrentValue)}`}
+        >
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                Portfolio value
+              </span>
               <GranularityFilter
                 current={granularity}
                 basePath="/"
@@ -315,65 +330,54 @@ export default async function DashboardPage({
                 }}
               />
             </div>
+            <PortfolioTrendChart data={portfolioTrend} />
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xs font-medium text-muted-foreground">
+                    Contributed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg font-semibold">
+                    {formatCurrency(hsbcTotalContributed)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xs font-medium text-muted-foreground">
+                    Current value
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg font-semibold">
+                    {formatCurrency(hsbcCurrentValue)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-strong bg-strong text-strong-foreground">
+                <CardHeader>
+                  <CardTitle className="text-xs font-medium text-strong-foreground/70">
+                    Growth
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg font-semibold text-strong-accent">
+                    {hsbcGrowth >= 0 ? "+" : ""}
+                    {hsbcGrowthPct.toFixed(1)}%
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <PortfolioTrendChart data={portfolioTrend} />
-        </CardContent>
-      </Card>
+        </DashboardSection>
 
-      <div className="grid grid-cols-3 gap-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Contributed
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">
-              {formatCurrency(hsbcTotalContributed)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Current value
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">
-              {formatCurrency(hsbcCurrentValue)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-strong bg-strong text-strong-foreground">
-          <CardHeader>
-            <CardTitle className="text-xs font-medium text-strong-foreground/70">
-              Growth
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold text-strong-accent">
-              {hsbcGrowth >= 0 ? "+" : ""}
-              {hsbcGrowthPct.toFixed(1)}%
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Link href="/receivables">
-        <Card className="transition-colors hover:bg-accent/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Users className="size-4" />
-              Receivables (included in net worth)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-2xl font-semibold">
-              {formatCurrency(receivablesTotal)}
-            </p>
+        <DashboardSection
+          title="Receivables"
+          summary={`${formatCurrency(receivablesTotal)} owed to you`}
+        >
+          <div className="space-y-2">
             {people.length > 0 ? (
               <ul className="space-y-1 text-sm">
                 {people.map(([person, amount]) => (
@@ -388,9 +392,155 @@ export default async function DashboardPage({
                 Nobody owes you anything right now.
               </p>
             )}
+            <Link
+              href="/receivables"
+              className="mt-2 block text-sm font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4 hover:decoration-4"
+            >
+              View Receivables →
+            </Link>
+          </div>
+        </DashboardSection>
+      </div>
+
+      <div className="hidden space-y-4 sm:block">
+        <QuickAdd />
+
+        <DateRangeFilter
+          current={range}
+          basePath="/"
+          customFrom={custom.from}
+          customTo={custom.to}
+          preserveParams={{
+            granularity: granularity === "monthly" ? undefined : granularity,
+          }}
+        />
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <SpendingChartCard
+            periodLabel={dateRangeLabel(range, custom)}
+            periodIncome={periodIncome}
+            periodExpenses={periodExpenses}
+            categoryTotals={categoryTotals}
+            monthlyTrend={monthlyTrend}
+          />
+          <RemindersCard
+            dueForMonth={now}
+            showLoanReminder={showLoanReminder}
+            showInvestmentsReminder={showInvestmentsReminder}
+          />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent transactions</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4">
+            <RecentTransactionsList entries={recentTransactions} />
+          </CardContent>
+          <div className="px-4 pb-4">
+            <Link
+              href="/dbs"
+              className="text-sm font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4 hover:decoration-4"
+            >
+              View {ACCOUNT_LABELS.dbs.primary} →
+            </Link>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="min-w-0 truncate text-base">
+                {ACCOUNT_LABELS.hsbc.primary} · portfolio value
+              </CardTitle>
+              <div className="shrink-0">
+                <GranularityFilter
+                  current={granularity}
+                  basePath="/"
+                  preserveParams={{
+                    range: range === "month" ? undefined : range,
+                    from: custom.from,
+                    to: custom.to,
+                  }}
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <PortfolioTrendChart data={portfolioTrend} />
           </CardContent>
         </Card>
-      </Link>
+
+        <div className="grid grid-cols-3 gap-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Contributed
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg font-semibold">
+                {formatCurrency(hsbcTotalContributed)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Current value
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg font-semibold">
+                {formatCurrency(hsbcCurrentValue)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-strong bg-strong text-strong-foreground">
+            <CardHeader>
+              <CardTitle className="text-xs font-medium text-strong-foreground/70">
+                Growth
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg font-semibold text-strong-accent">
+                {hsbcGrowth >= 0 ? "+" : ""}
+                {hsbcGrowthPct.toFixed(1)}%
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Link href="/receivables">
+          <Card className="transition-colors hover:bg-accent/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Users className="size-4" />
+                Receivables (included in net worth)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-2xl font-semibold">
+                {formatCurrency(receivablesTotal)}
+              </p>
+              {people.length > 0 ? (
+                <ul className="space-y-1 text-sm">
+                  {people.map(([person, amount]) => (
+                    <li key={person} className="flex justify-between">
+                      <span className="text-muted-foreground">{person}</span>
+                      <span>{formatCurrency(amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nobody owes you anything right now.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
     </div>
   );
 }

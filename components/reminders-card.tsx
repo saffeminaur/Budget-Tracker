@@ -6,6 +6,11 @@ interface RemindersCardProps {
   dueForMonth: Date;
   showLoanReminder: boolean;
   showInvestmentsReminder: boolean;
+  // Renders nothing at all (not even an empty-state card) when there's
+  // nothing due — used on the mobile dashboard, where this card sits in
+  // the always-visible top section and shouldn't take up space when
+  // there's nothing to show.
+  hideWhenEmpty?: boolean;
 }
 
 // Compact "pill" teasers — tapping one takes you to the page with the full
@@ -14,8 +19,11 @@ export function RemindersCard({
   dueForMonth,
   showLoanReminder,
   showInvestmentsReminder,
+  hideWhenEmpty = false,
 }: RemindersCardProps) {
   const hasAny = showLoanReminder || showInvestmentsReminder;
+
+  if (!hasAny && hideWhenEmpty) return null;
 
   return (
     <Card className="h-full">

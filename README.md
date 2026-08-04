@@ -12,6 +12,7 @@ dashboard.
 - Supabase: Postgres + Auth (email/password) + Row Level Security
 - Tailwind CSS + shadcn/ui
 - Hand-rolled PWA support (manifest, icons, minimal service worker) — no `next-pwa`
+- Google Gemini API (server-only) for the dashboard's "Quick add" free-text parser
 
 ## One-time Supabase setup
 
@@ -29,7 +30,7 @@ dashboard.
 
 ```bash
 npm install
-cp .env.example .env.local   # then fill in the two Supabase values
+cp .env.example .env.local   # then fill in the Supabase values (Gemini is optional)
 npm run dev
 ```
 
@@ -41,15 +42,21 @@ Open http://localhost:3000 and sign in with the user you created in Supabase.
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → anon/public key |
+| `GEMINI_API_KEY` | https://aistudio.google.com/apikey (free tier). Optional — without it, "Quick add" shows an error but the rest of the app works normally. |
+| `GEMINI_MODEL` | Optional, defaults to `gemini-flash-latest` (Google's alias for its current flash-tier model — safer than pinning a dated name, since those get retired for new API keys). |
 
-Both are safe to expose client-side — that's what the `anon` key is for. Row Level
-Security is what actually protects your data, not keeping this key secret.
+The two `NEXT_PUBLIC_` values are safe to expose client-side — that's what the
+`anon` key is for. Row Level Security is what actually protects your data, not
+keeping this key secret. `GEMINI_API_KEY` is the opposite: it's **never**
+prefixed with `NEXT_PUBLIC_` and is only ever read inside Server Actions
+(`actions/quick-add.ts` → `lib/gemini.ts`, guarded with `import "server-only"`),
+so it's never bundled into client-side JavaScript.
 
 ## Deploying to Vercel
 
 1. Push this repo to GitHub (or GitLab/Bitbucket).
 2. In Vercel, **Add New → Project**, import the repo. Next.js is auto-detected.
-3. Add the two environment variables above under **Project Settings →
+3. Add the environment variables above under **Project Settings →
    Environment Variables** (for Production, Preview, and Development).
 4. Deploy. No other configuration is needed.
 

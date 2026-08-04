@@ -23,7 +23,7 @@ export function HsbcReminderBanner({
     <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
       <CardContent className="space-y-3">
         <p className="text-sm font-medium">
-          Time to update your HSBC portfolio value for{" "}
+          Time to update your portfolio value for{" "}
           {formatMonthYear(dueForMonth)}
         </p>
         <Button type="button" size="sm" onClick={onLogNow}>

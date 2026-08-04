@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Budget Tracker",
+  title: "Femina Budget Tracker",
   description: "Personal budget tracker: savings, spending, receivables, investments and loans.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Budget Tracker",
+    title: "Femina Budget Tracker",
   },
   icons: {
     icon: [

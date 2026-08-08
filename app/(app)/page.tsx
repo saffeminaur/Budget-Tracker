@@ -352,32 +352,14 @@ export default async function DashboardPage({
           </div>
         </DashboardSection>
 
-        <DashboardSection
-          title="Recent transactions"
-          summary={`${recentTransactions.length} recent`}
-        >
-          <RecentTransactionsList entries={recentTransactions} />
-          <Link
-            href="/dbs"
-            className="mt-4 block text-sm font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4 hover:decoration-4"
-          >
-            View {ACCOUNT_LABELS.dbs.primary} →
-          </Link>
-        </DashboardSection>
+        <RecentTransactionsList entries={recentTransactions} />
 
-        {recentAutoImported.length > 0 && (
-          <DashboardSection
-            title="Recently auto-added"
-            summary={`${recentAutoImported.length} from email import`}
-          >
-            <AutoImportedList
-              entries={recentAutoImported}
-              deleteDbsAction={deleteDbsEntry}
-              deleteMaribankAction={deleteMaribankEntry}
-              toggleBudgetAction={setDbsCountsTowardBudget}
-            />
-          </DashboardSection>
-        )}
+        <AutoImportedList
+          entries={recentAutoImported}
+          deleteDbsAction={deleteDbsEntry}
+          deleteMaribankAction={deleteMaribankEntry}
+          toggleBudgetAction={setDbsCountsTowardBudget}
+        />
 
         <DashboardSection
           title="Investments"
@@ -500,38 +482,14 @@ export default async function DashboardPage({
           />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent transactions</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4">
-            <RecentTransactionsList entries={recentTransactions} />
-          </CardContent>
-          <div className="px-4 pb-4">
-            <Link
-              href="/dbs"
-              className="text-sm font-semibold text-foreground underline decoration-primary decoration-2 underline-offset-4 hover:decoration-4"
-            >
-              View {ACCOUNT_LABELS.dbs.primary} →
-            </Link>
-          </div>
-        </Card>
+        <RecentTransactionsList entries={recentTransactions} />
 
-        {recentAutoImported.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Recently auto-added</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4">
-              <AutoImportedList
-                entries={recentAutoImported}
-                deleteDbsAction={deleteDbsEntry}
-                deleteMaribankAction={deleteMaribankEntry}
-                toggleBudgetAction={setDbsCountsTowardBudget}
-              />
-            </CardContent>
-          </Card>
-        )}
+        <AutoImportedList
+          entries={recentAutoImported}
+          deleteDbsAction={deleteDbsEntry}
+          deleteMaribankAction={deleteMaribankEntry}
+          toggleBudgetAction={setDbsCountsTowardBudget}
+        />
 
         <Card>
           <CardHeader>

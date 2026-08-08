@@ -41,6 +41,54 @@ export function formatMonthYear(date: Date) {
   return date.toLocaleDateString("en-SG", { month: "long", year: "numeric" });
 }
 
+function formatDateShort(isoDate: string, referenceYear: number) {
+  const d = new Date(`${isoDate}T00:00:00`);
+  return d.toLocaleDateString("en-SG", {
+    day: "numeric",
+    month: "short",
+    year: d.getFullYear() === referenceYear ? undefined : "numeric",
+  });
+}
+
+export interface DateGroup<T> {
+  label: string;
+  entries: T[];
+}
+
+// Buckets already-descending-sorted entries under relative headers (Today,
+// Yesterday, This week) for the last week, then falls back to the actual
+// date for anything older — lets a scan of a long list answer "when" at a
+// glance instead of reading every row's date.
+export function groupByDate<T>(
+  entries: T[],
+  getIsoDate: (entry: T) => string,
+  todayIso: string
+): DateGroup<T>[] {
+  const today = new Date(`${todayIso}T00:00:00`);
+  const referenceYear = today.getFullYear();
+
+  function labelFor(isoDate: string) {
+    const d = new Date(`${isoDate}T00:00:00`);
+    const diffDays = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays >= 2 && diffDays <= 6) return "This week";
+    return formatDateShort(isoDate, referenceYear);
+  }
+
+  const groups: DateGroup<T>[] = [];
+  for (const entry of entries) {
+    const label = labelFor(getIsoDate(entry));
+    const last = groups[groups.length - 1];
+    if (last?.label === label) {
+      last.entries.push(entry);
+    } else {
+      groups.push({ label, entries: [entry] });
+    }
+  }
+  return groups;
+}
+
 export function firstOfPreviousMonthIsoDate() {
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);

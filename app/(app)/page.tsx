@@ -234,7 +234,7 @@ export default async function DashboardPage({
       .filter((e) => e.source === "auto_import")
       .map((e) => ({ account: "maribank" as const, entry: e })),
   ]
-    .sort((a, b) => b.entry.created_at.localeCompare(a.entry.created_at))
+    .sort((a, b) => b.entry.entry_date.localeCompare(a.entry.entry_date))
     .slice(0, 15);
 
   const recentAutoImported: AutoImportedItem[] = autoImportedSource.map(({ account, entry }) => ({

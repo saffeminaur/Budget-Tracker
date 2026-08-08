@@ -8,37 +8,22 @@ export interface BreakdownEntry {
   entry_date: string;
 }
 
-interface TransactionBreakdownPanelProps {
+interface BreakdownListProps {
   title: string;
   subtitle?: string;
   entries: BreakdownEntry[];
   viewAllHref: string;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
-  className?: string;
 }
 
-// The quick-glance popup shared by the "Budget spend" figure and the
+// The quick-glance content shared by the "Budget spend" figure and the
 // category chart bars — a lightweight list, not a full page, for "let me
 // double check what's in this number" without leaving the dashboard.
-export function TransactionBreakdownPanel({
-  title,
-  subtitle,
-  entries,
-  viewAllHref,
-  onMouseEnter,
-  onMouseLeave,
-  className,
-}: TransactionBreakdownPanelProps) {
+// Unstyled box-wise (no border/background/padding) so it can drop into
+// either a plain floating panel (TransactionBreakdownPanel below) or a
+// pre-boxed container like Popover's content.
+export function BreakdownList({ title, subtitle, entries, viewAllHref }: BreakdownListProps) {
   return (
-    <div
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      className={cn(
-        "rounded-lg border bg-popover p-3 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10",
-        className
-      )}
-    >
+    <>
       <p className="font-medium">{title}</p>
       {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
 
@@ -66,6 +51,34 @@ export function TransactionBreakdownPanel({
       >
         View all →
       </Link>
+    </>
+  );
+}
+
+interface TransactionBreakdownPanelProps extends BreakdownListProps {
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  className?: string;
+}
+
+// Self-boxed version of BreakdownList for callers that position/show it
+// themselves (the category chart bars), rather than going through Popover.
+export function TransactionBreakdownPanel({
+  onMouseEnter,
+  onMouseLeave,
+  className,
+  ...listProps
+}: TransactionBreakdownPanelProps) {
+  return (
+    <div
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className={cn(
+        "rounded-lg border bg-popover p-3 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10",
+        className
+      )}
+    >
+      <BreakdownList {...listProps} />
     </div>
   );
 }

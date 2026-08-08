@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  TransactionBreakdownPanel,
-  type BreakdownEntry,
-} from "@/components/transaction-breakdown-panel";
-import { useHasHover } from "@/lib/use-has-hover";
+import type { ReactNode } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { BreakdownList, type BreakdownEntry } from "@/components/transaction-breakdown-panel";
 import { cn } from "@/lib/utils";
 
 interface BudgetBreakdownTriggerProps {
@@ -15,13 +12,14 @@ interface BudgetBreakdownTriggerProps {
   viewAllHref: string;
   children: ReactNode;
   triggerClassName?: string;
-  panelClassName?: string;
 }
 
-// Desktop: hover opens/closes the breakdown, with a short close delay so
-// moving the pointer from the trigger onto the panel (e.g. to click "View
-// all") doesn't dismiss it. Touch: tap toggles it, and a tap anywhere else
-// closes it, since there's no hover-out to rely on.
+// Desktop: hovering opens the breakdown (base-ui's own hover-intent
+// handling, with a close delay so moving the pointer onto the popup to
+// click "View all" doesn't dismiss it first). Touch: tapping opens/closes
+// it. Rendered through a portal with viewport-aware positioning, so it can
+// never get clipped by an ancestor card's `overflow-hidden` regardless of
+// where the trigger sits inside it.
 export function BudgetBreakdownTrigger({
   title,
   subtitle,
@@ -29,63 +27,25 @@ export function BudgetBreakdownTrigger({
   viewAllHref,
   children,
   triggerClassName,
-  panelClassName,
 }: BudgetBreakdownTriggerProps) {
-  const hasHover = useHasHover();
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function openNow() {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    setOpen(true);
-  }
-
-  function scheduleClose() {
-    closeTimer.current = setTimeout(() => setOpen(false), 150);
-  }
-
-  useEffect(() => {
-    if (!open) return;
-    function handlePointerDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [open]);
-
   return (
-    <div
-      ref={containerRef}
-      className="relative inline-block"
-      onMouseEnter={hasHover ? openNow : undefined}
-      onMouseLeave={hasHover ? scheduleClose : undefined}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className={cn("cursor-pointer", triggerClassName)}
+    <Popover>
+      <PopoverTrigger
+        openOnHover
+        delay={0}
+        closeDelay={150}
+        className={cn(triggerClassName)}
       >
         {children}
-      </button>
-
-      {open && (
-        <TransactionBreakdownPanel
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3 text-xs">
+        <BreakdownList
           title={title}
           subtitle={subtitle}
           entries={entries}
           viewAllHref={viewAllHref}
-          onMouseEnter={hasHover ? openNow : undefined}
-          onMouseLeave={hasHover ? scheduleClose : undefined}
-          className={cn(
-            "absolute top-full left-1/2 z-20 mt-2 w-64 -translate-x-1/2",
-            panelClassName
-          )}
         />
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

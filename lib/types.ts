@@ -1,5 +1,9 @@
 export type Category = "Food" | "Transport" | "Shopping" | "Bills" | "Other";
 
+// 'auto_import' = created unattended by /api/ingest-email. Everything
+// else (the manual entry dialog, Femina AI quick-add) is 'manual'.
+export type EntrySource = "manual" | "auto_import";
+
 export const CATEGORIES: Category[] = [
   "Food",
   "Transport",
@@ -15,6 +19,7 @@ export interface MaribankEntry {
   note: string | null;
   entry_date: string;
   created_at: string;
+  source: EntrySource;
 }
 
 export interface DbsEntry {
@@ -29,6 +34,7 @@ export interface DbsEntry {
   // and spending stats, without affecting the account balance.
   counts_toward_budget: boolean;
   created_at: string;
+  source: EntrySource;
 }
 
 export interface ReceivableEntry {
@@ -73,6 +79,22 @@ export interface MendakiRepayment {
   note: string | null;
   entry_date: string;
   created_at: string;
+}
+
+// Audit trail + dedup guard for /api/ingest-email — see supabase/schema.sql.
+export interface EmailIngestLogEntry {
+  id: string;
+  user_id: string;
+  message_id: string;
+  status: "success" | "failed";
+  account: "dbs" | "maribank" | null;
+  reason: string | null;
+  raw_subject: string | null;
+  raw_body: string | null;
+  entry_table: "dbs_entries" | "maribank_entries" | null;
+  entry_id: string | null;
+  created_at: string;
+  dismissed_at: string | null;
 }
 
 // ============================================================

@@ -6,6 +6,8 @@ import { QuickAdd } from "@/components/quick-add";
 import { SpendingChartCard } from "@/components/spending-chart-card";
 import { RemindersCard } from "@/components/reminders-card";
 import { RecentTransactionsList } from "@/components/recent-transactions-list";
+import { AutoImportedList, type AutoImportedItem } from "@/components/auto-imported-list";
+import { ImportIssuesCard, type ImportIssue } from "@/components/import-issues-card";
 import { DashboardSection } from "@/components/dashboard-section";
 import { DateRangeFilter } from "@/components/date-range-filter";
 import { GranularityFilter } from "@/components/granularity-filter";
@@ -33,10 +35,14 @@ import {
   type PageSearchParams,
 } from "@/lib/utils";
 import { ACCOUNT_LABELS } from "@/lib/account-labels";
+import { deleteDbsEntry, setDbsCountsTowardBudget } from "@/actions/dbs";
+import { deleteMaribankEntry } from "@/actions/maribank";
+import { dismissIngestFailure } from "@/actions/email-ingest-log";
 import { PiggyBank, Wallet, TrendingUp, Landmark, Users } from "lucide-react";
 import type {
   Category,
   DbsEntry,
+  EmailIngestLogEntry,
   HsbcContribution,
   HsbcValuation,
   MaribankEntry,
@@ -64,6 +70,7 @@ export default async function DashboardPage({
     { data: hsbcValuationsData },
     { data: loanData },
     { data: repaymentsData },
+    { data: ingestFailuresData },
   ] = await Promise.all([
     supabase.from("maribank_entries").select("*"),
     supabase
@@ -80,9 +87,17 @@ export default async function DashboardPage({
       .order("created_at", { ascending: false }),
     supabase.from("mendaki_loan").select("*").maybeSingle(),
     supabase.from("mendaki_repayments").select("*"),
+    supabase
+      .from("email_ingest_log")
+      .select("*")
+      .eq("status", "failed")
+      .is("dismissed_at", null)
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
-  const maribankBalance = sum(((maribankData ?? []) as MaribankEntry[]).map((e) => e.amount));
+  const maribankEntries = (maribankData ?? []) as MaribankEntry[];
+  const maribankBalance = sum(maribankEntries.map((e) => e.amount));
   const dbsEntries = (dbsData ?? []) as DbsEntry[];
   const dbsBalance = sum(dbsEntries.map((e) => e.amount));
   const receivables = (receivablesData ?? []) as ReceivableEntry[];
@@ -208,6 +223,43 @@ export default async function DashboardPage({
 
   const recentTransactions = dbsEntries.slice(0, 6);
 
+  // "Recently auto-added" — entries created unattended by /api/ingest-email
+  // (see actions/dbs.ts, actions/maribank.ts). Derived from the account
+  // arrays already fetched above rather than a separate query.
+  const autoImportedSource = [
+    ...dbsEntries
+      .filter((e) => e.source === "auto_import")
+      .map((e) => ({ account: "dbs" as const, entry: e })),
+    ...maribankEntries
+      .filter((e) => e.source === "auto_import")
+      .map((e) => ({ account: "maribank" as const, entry: e })),
+  ]
+    .sort((a, b) => b.entry.created_at.localeCompare(a.entry.created_at))
+    .slice(0, 15);
+
+  const recentAutoImported: AutoImportedItem[] = autoImportedSource.map(({ account, entry }) => ({
+    id: entry.id,
+    account,
+    amount: entry.amount,
+    note: entry.note,
+    entry_date: entry.entry_date,
+    countsTowardBudget:
+      account === "dbs" && entry.amount < 0
+        ? (entry as DbsEntry).counts_toward_budget
+        : undefined,
+  }));
+
+  const importIssues: ImportIssue[] = ((ingestFailuresData ?? []) as EmailIngestLogEntry[]).map(
+    (log) => ({
+      id: log.id,
+      reason: log.reason,
+      account: log.account,
+      rawSubject: log.raw_subject,
+      rawBody: log.raw_body,
+      createdAt: log.created_at,
+    })
+  );
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <NetWorthCard
@@ -260,6 +312,8 @@ export default async function DashboardPage({
           without a long scroll. Desktop keeps the original always-expanded
           layout, unchanged, in the block below. */}
       <div className="space-y-3 sm:hidden">
+        <ImportIssuesCard issues={importIssues} dismissAction={dismissIngestFailure} />
+
         <RemindersCard
           dueForMonth={now}
           showLoanReminder={showLoanReminder}
@@ -310,6 +364,20 @@ export default async function DashboardPage({
             View {ACCOUNT_LABELS.dbs.primary} →
           </Link>
         </DashboardSection>
+
+        {recentAutoImported.length > 0 && (
+          <DashboardSection
+            title="Recently auto-added"
+            summary={`${recentAutoImported.length} from email import`}
+          >
+            <AutoImportedList
+              entries={recentAutoImported}
+              deleteDbsAction={deleteDbsEntry}
+              deleteMaribankAction={deleteMaribankEntry}
+              toggleBudgetAction={setDbsCountsTowardBudget}
+            />
+          </DashboardSection>
+        )}
 
         <DashboardSection
           title="Investments"
@@ -403,6 +471,8 @@ export default async function DashboardPage({
       </div>
 
       <div className="hidden space-y-4 sm:block">
+        <ImportIssuesCard issues={importIssues} dismissAction={dismissIngestFailure} />
+
         <QuickAdd />
 
         <DateRangeFilter
@@ -446,6 +516,22 @@ export default async function DashboardPage({
             </Link>
           </div>
         </Card>
+
+        {recentAutoImported.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Recently auto-added</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4">
+              <AutoImportedList
+                entries={recentAutoImported}
+                deleteDbsAction={deleteDbsEntry}
+                deleteMaribankAction={deleteMaribankEntry}
+                toggleBudgetAction={setDbsCountsTowardBudget}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

@@ -87,6 +87,30 @@ export async function updateDbsEntry(formData: FormData) {
   revalidatePath("/");
 }
 
+// Dashboard "Recently auto-added" toggle — flips counts_toward_budget on
+// a single DBS entry without opening the full edit dialog.
+export async function setDbsCountsTowardBudget(formData: FormData) {
+  await requireUser();
+
+  const id = String(formData.get("id"));
+  const counts_toward_budget = formData.get("counts_toward_budget") === "true";
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("dbs_entries")
+    .update({ counts_toward_budget })
+    .eq("id", id);
+
+  if (error) {
+    console.error("setDbsCountsTowardBudget failed:", error);
+    throw new Error(`Couldn't update the entry: ${error.message}`);
+  }
+
+  revalidatePath("/dbs");
+  revalidatePath("/");
+}
+
 export async function deleteDbsEntry(formData: FormData) {
   await requireUser();
   const id = String(formData.get("id"));

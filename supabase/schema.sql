@@ -13,8 +13,17 @@ create table if not exists public.maribank_entries (
   amount numeric(12, 2) not null,
   note text,
   entry_date date not null default current_date,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- 'auto_import' = created by /api/ingest-email, unattended. Everything
+  -- else (the manual entry dialog, Femina AI quick-add) is 'manual'.
+  source text not null default 'manual' check (source in ('manual', 'auto_import'))
 );
+
+-- Migration for databases created before email ingestion was added.
+-- Safe to re-run.
+alter table public.maribank_entries add column if not exists source text not null default 'manual';
+alter table public.maribank_entries drop constraint if exists maribank_entries_source_check;
+alter table public.maribank_entries add constraint maribank_entries_source_check check (source in ('manual', 'auto_import'));
 
 -- ============================================================
 -- 2. DBS (daily spending) — signed entries; Expenses carry a category,
@@ -30,7 +39,10 @@ create table if not exists public.dbs_entries (
   -- Expenses only. Lets a one-off purchase be excluded from monthly budget
   -- totals/stats without excluding it from the account balance.
   counts_toward_budget boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- 'auto_import' = created by /api/ingest-email, unattended. Everything
+  -- else (the manual entry dialog, Femina AI quick-add) is 'manual'.
+  source text not null default 'manual' check (source in ('manual', 'auto_import'))
 );
 
 -- Migration for databases created before Income/Expense typing was added
@@ -40,6 +52,12 @@ alter table public.dbs_entries alter column category drop not null;
 -- Migration for databases created before per-expense budget opt-out was
 -- added. Safe to re-run.
 alter table public.dbs_entries add column if not exists counts_toward_budget boolean not null default true;
+
+-- Migration for databases created before email ingestion was added.
+-- Safe to re-run.
+alter table public.dbs_entries add column if not exists source text not null default 'manual';
+alter table public.dbs_entries drop constraint if exists dbs_entries_source_check;
+alter table public.dbs_entries add constraint dbs_entries_source_check check (source in ('manual', 'auto_import'));
 
 -- ============================================================
 -- 3. Receivables — money others owe me, tracked per person
@@ -95,6 +113,36 @@ create table if not exists public.mendaki_repayments (
 );
 
 -- ============================================================
+-- 6. Email ingestion log — audit trail + dedup guard for
+--    /api/ingest-email (see route.ts). Written with the service-role
+--    key, since that endpoint has no user session to authenticate with.
+--    The unique (user_id, message_id) constraint is what makes
+--    re-processing the same email a safe no-op.
+-- ============================================================
+create table if not exists public.email_ingest_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  message_id text not null,
+  status text not null check (status in ('success', 'failed')),
+  account text check (account in ('dbs', 'maribank')),
+  reason text,
+  raw_subject text,
+  raw_body text,
+  entry_table text check (entry_table in ('dbs_entries', 'maribank_entries')),
+  entry_id uuid,
+  created_at timestamptz not null default now(),
+  -- Set when the dashboard's "Import issues" card is dismissed for this
+  -- row. Soft-dismiss rather than delete, so the audit trail survives —
+  -- the dashboard just stops showing it.
+  dismissed_at timestamptz,
+  unique (user_id, message_id)
+);
+
+-- Migration for databases created before the "Import issues" dashboard
+-- card was added. Safe to re-run.
+alter table public.email_ingest_log add column if not exists dismissed_at timestamptz;
+
+-- ============================================================
 -- Indexes
 -- ============================================================
 create index if not exists maribank_entries_user_id_idx on public.maribank_entries (user_id, entry_date desc);
@@ -103,6 +151,8 @@ create index if not exists receivables_entries_user_id_idx on public.receivables
 create index if not exists hsbc_contributions_user_id_idx on public.hsbc_contributions (user_id, entry_date desc);
 create index if not exists hsbc_valuations_user_id_idx on public.hsbc_valuations (user_id, entry_date desc);
 create index if not exists mendaki_repayments_user_id_idx on public.mendaki_repayments (user_id, entry_date desc);
+create index if not exists email_ingest_log_user_id_idx on public.email_ingest_log (user_id, created_at desc);
+create index if not exists email_ingest_log_unresolved_idx on public.email_ingest_log (user_id, status, dismissed_at);
 
 -- ============================================================
 -- Row Level Security — every table scoped to auth.uid()
@@ -114,6 +164,7 @@ alter table public.hsbc_contributions enable row level security;
 alter table public.hsbc_valuations enable row level security;
 alter table public.mendaki_loan enable row level security;
 alter table public.mendaki_repayments enable row level security;
+alter table public.email_ingest_log enable row level security;
 
 drop policy if exists "own rows only" on public.maribank_entries;
 create policy "own rows only" on public.maribank_entries
@@ -141,6 +192,10 @@ create policy "own rows only" on public.mendaki_loan
 
 drop policy if exists "own rows only" on public.mendaki_repayments;
 create policy "own rows only" on public.mendaki_repayments
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own rows only" on public.email_ingest_log;
+create policy "own rows only" on public.email_ingest_log
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ============================================================

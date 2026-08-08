@@ -213,6 +213,18 @@ export function parseGranularity(value: string | string[] | undefined): Granular
   return value === "daily" || value === "yearly" ? value : "monthly";
 }
 
+export type BudgetFilter = "all" | "counted" | "excluded";
+
+export const BUDGET_FILTER_OPTIONS: { value: BudgetFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "counted", label: "Counted toward budget" },
+  { value: "excluded", label: "Excluded" },
+];
+
+export function parseBudgetFilter(value: string | string[] | undefined): BudgetFilter {
+  return value === "counted" || value === "excluded" ? value : "all";
+}
+
 export function formatCompactCurrency(value: number) {
   if (Math.abs(value) >= 1000) {
     const thousands = value / 1000;

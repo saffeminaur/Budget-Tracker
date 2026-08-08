@@ -3,6 +3,7 @@ import { addDbsEntry, deleteDbsEntry, updateDbsEntry } from "@/actions/dbs";
 import { EntryForm } from "@/components/entry-form";
 import { SearchableEntryList } from "@/components/searchable-entry-list";
 import { DateRangeFilter } from "@/components/date-range-filter";
+import { BudgetFilterTabs } from "@/components/budget-filter";
 import { AccountHeader } from "@/components/account-header";
 import {
   Card,
@@ -22,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   formatCurrency,
   isWithinDateRange,
+  parseBudgetFilter,
   parseRangeSearchParams,
   sum,
   type PageSearchParams,
@@ -32,11 +34,13 @@ import { ACCOUNT_LABELS } from "@/lib/account-labels";
 export default async function DbsPage({
   searchParams,
 }: {
-  searchParams: Promise<PageSearchParams>;
+  searchParams: Promise<PageSearchParams & { budget?: string | string[] }>;
 }) {
   await requireUser();
   const supabase = await createClient();
-  const { range, custom } = parseRangeSearchParams(await searchParams);
+  const resolvedSearchParams = await searchParams;
+  const { range, custom } = parseRangeSearchParams(resolvedSearchParams);
+  const budgetFilter = parseBudgetFilter(resolvedSearchParams.budget);
 
   const { data } = await supabase
     .from("dbs_entries")
@@ -46,9 +50,13 @@ export default async function DbsPage({
 
   const entries = (data ?? []) as DbsEntry[];
   const balance = sum(entries.map((e) => e.amount));
-  const filteredEntries = entries.filter((e) =>
-    isWithinDateRange(e.entry_date, range, new Date(), custom)
-  );
+  const filteredEntries = entries
+    .filter((e) => isWithinDateRange(e.entry_date, range, new Date(), custom))
+    .filter((e) => {
+      if (budgetFilter === "all") return true;
+      const isCountedExpense = e.amount < 0 && e.counts_toward_budget;
+      return budgetFilter === "counted" ? isCountedExpense : e.amount < 0 && !e.counts_toward_budget;
+    });
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
@@ -112,6 +120,19 @@ export default async function DbsPage({
         basePath="/dbs"
         customFrom={custom.from}
         customTo={custom.to}
+        preserveParams={{
+          budget: budgetFilter === "all" ? undefined : budgetFilter,
+        }}
+      />
+
+      <BudgetFilterTabs
+        current={budgetFilter}
+        basePath="/dbs"
+        preserveParams={{
+          range: range === "month" ? undefined : range,
+          from: custom.from,
+          to: custom.to,
+        }}
       />
 
       <Card>

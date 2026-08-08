@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBreakdownChart } from "@/components/category-breakdown-chart";
 import { SpendingTrendChart, type MonthlySpend } from "@/components/spending-trend-chart";
+import { BudgetBreakdownTrigger } from "@/components/budget-breakdown-trigger";
+import type { BreakdownEntry } from "@/components/transaction-breakdown-panel";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Category } from "@/lib/types";
 
@@ -14,6 +16,9 @@ interface SpendingChartCardProps {
   periodIncome: number;
   periodExpenses: number;
   categoryTotals: Partial<Record<Category, number>>;
+  entriesByCategory: Partial<Record<Category, BreakdownEntry[]>>;
+  budgetEntries: BreakdownEntry[];
+  budgetViewAllHref: string;
   monthlyTrend: MonthlySpend[];
 }
 
@@ -22,6 +27,9 @@ export function SpendingChartCard({
   periodIncome,
   periodExpenses,
   categoryTotals,
+  entriesByCategory,
+  budgetEntries,
+  budgetViewAllHref,
   monthlyTrend,
 }: SpendingChartCardProps) {
   const [view, setView] = useState<View>("category");
@@ -69,9 +77,15 @@ export function SpendingChartCard({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Budget spend</p>
-            <p className="text-sm font-semibold text-destructive">
+            <BudgetBreakdownTrigger
+              title="Budget spend"
+              subtitle={periodLabel}
+              entries={budgetEntries}
+              viewAllHref={budgetViewAllHref}
+              triggerClassName="text-sm font-semibold text-destructive"
+            >
               {formatCurrency(periodExpenses)}
-            </p>
+            </BudgetBreakdownTrigger>
           </div>
         </div>
 
@@ -80,7 +94,11 @@ export function SpendingChartCard({
         </p>
 
         {view === "category" ? (
-          <CategoryBreakdownChart totals={categoryTotals} />
+          <CategoryBreakdownChart
+            totals={categoryTotals}
+            entriesByCategory={entriesByCategory}
+            viewAllHref={budgetViewAllHref}
+          />
         ) : (
           <SpendingTrendChart data={monthlyTrend} />
         )}

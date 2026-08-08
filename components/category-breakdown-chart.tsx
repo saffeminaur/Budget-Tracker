@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -7,10 +8,14 @@ import {
   Cell,
   LabelList,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  TransactionBreakdownPanel,
+  type BreakdownEntry,
+} from "@/components/transaction-breakdown-panel";
+import { useHasHover } from "@/lib/use-has-hover";
 import { formatCompactCurrency, formatCurrency } from "@/lib/utils";
 import type { Category } from "@/lib/types";
 
@@ -36,54 +41,55 @@ const CATEGORY_ORDER: Category[] = [
 interface Row {
   category: Category;
   amount: number;
-  // Denormalized onto each row (rather than read from a closure) so the
-  // tooltip below can stay a plain, stable component.
-  grandTotal: number;
-}
-
-interface TooltipEntry {
-  payload: Row;
-}
-
-function ChartTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: TooltipEntry[];
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-  const row = payload[0].payload;
-  const sharePct = row.grandTotal > 0 ? Math.round((row.amount / row.grandTotal) * 100) : 0;
-
-  return (
-    <div className="rounded-lg border bg-popover p-3 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10">
-      <div className="flex items-center gap-2">
-        <span
-          className="size-2 shrink-0 rounded-full"
-          style={{ backgroundColor: CATEGORY_VAR[row.category] }}
-        />
-        <span className="font-medium">{row.category}</span>
-        <span className="ml-auto tabular-nums">{formatCurrency(row.amount)}</span>
-      </div>
-      <p className="mt-0.5 text-muted-foreground">{sharePct}% of spending</p>
-    </div>
-  );
 }
 
 interface CategoryBreakdownChartProps {
   totals: Partial<Record<Category, number>>;
+  entriesByCategory: Partial<Record<Category, BreakdownEntry[]>>;
+  viewAllHref: string;
 }
 
+// Tapping/hovering a bar shows exactly which transactions make up that
+// category's total — same breakdown popup as the "Budget spend" figure,
+// anchored to the chart instead of to each bar (bars live in an SVG, so a
+// per-bar-anchored popup isn't worth the positioning complexity for what's
+// meant to be a quick glance, not a full modal).
 export function CategoryBreakdownChart({
   totals,
+  entriesByCategory,
+  viewAllHref,
 }: CategoryBreakdownChartProps) {
-  const baseRows = CATEGORY_ORDER.map((category) => ({
+  const hasHover = useHasHover();
+  const [active, setActive] = useState<Category | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function openNow(category: Category) {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setActive(category);
+  }
+
+  function scheduleClose() {
+    closeTimer.current = setTimeout(() => setActive(null), 150);
+  }
+
+  useEffect(() => {
+    if (!active) return;
+    function handlePointerDown(e: PointerEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setActive(null);
+      }
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [active]);
+
+  const rows: Row[] = CATEGORY_ORDER.map((category) => ({
     category,
     amount: totals[category] ?? 0,
   })).filter((row) => row.amount > 0);
 
-  if (baseRows.length === 0) {
+  if (rows.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-muted-foreground">
         No spending logged yet.
@@ -91,11 +97,10 @@ export function CategoryBreakdownChart({
     );
   }
 
-  const grandTotal = baseRows.reduce((t, r) => t + r.amount, 0);
-  const rows: Row[] = baseRows.map((row) => ({ ...row, grandTotal }));
+  const grandTotal = rows.reduce((t, r) => t + r.amount, 0);
 
   return (
-    <div className="category-chart">
+    <div className="category-chart relative" ref={containerRef}>
       <ResponsiveContainer width="100%" height={240}>
         <BarChart data={rows} margin={{ top: 36, right: 4, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--cat-grid)" strokeWidth={1} strokeDasharray="0" />
@@ -113,10 +118,19 @@ export function CategoryBreakdownChart({
             tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             tickFormatter={(value: number) => formatCompactCurrency(value)}
           />
-          <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.4 }} />
           <Bar dataKey="amount" radius={[4, 4, 0, 0]} stroke="var(--foreground)" strokeWidth={1} maxBarSize={56}>
             {rows.map((row) => (
-              <Cell key={row.category} fill={CATEGORY_VAR[row.category]} />
+              <Cell
+                key={row.category}
+                fill={CATEGORY_VAR[row.category]}
+                opacity={active && active !== row.category ? 0.5 : 1}
+                style={{ cursor: "pointer" }}
+                onMouseEnter={hasHover ? () => openNow(row.category) : undefined}
+                onMouseLeave={hasHover ? scheduleClose : undefined}
+                onClick={() =>
+                  setActive((current) => (current === row.category ? null : row.category))
+                }
+              />
             ))}
             <LabelList
               dataKey="amount"
@@ -128,6 +142,18 @@ export function CategoryBreakdownChart({
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+
+      {active && (
+        <TransactionBreakdownPanel
+          title={active}
+          subtitle={`${formatCurrency(totals[active] ?? 0)} · ${Math.round(((totals[active] ?? 0) / grandTotal) * 100)}% of spending`}
+          entries={entriesByCategory[active] ?? []}
+          viewAllHref={viewAllHref}
+          onMouseEnter={hasHover ? () => openNow(active) : undefined}
+          onMouseLeave={hasHover ? scheduleClose : undefined}
+          className="absolute top-2 right-2 z-20 w-64"
+        />
+      )}
     </div>
   );
 }

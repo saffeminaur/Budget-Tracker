@@ -4,6 +4,7 @@ import { NetWorthCard } from "@/components/net-worth-card";
 import { AccountSummaryCard } from "@/components/account-summary-card";
 import { QuickAdd } from "@/components/quick-add";
 import { SpendingChartCard } from "@/components/spending-chart-card";
+import type { BreakdownEntry } from "@/components/transaction-breakdown-panel";
 import { RemindersCard } from "@/components/reminders-card";
 import { RecentTransactionsList } from "@/components/recent-transactions-list";
 import { AutoImportedList, type AutoImportedItem } from "@/components/auto-imported-list";
@@ -185,10 +186,12 @@ export default async function DashboardPage({
   );
 
   const categoryTotals: Partial<Record<Category, number>> = {};
+  const entriesByCategory: Partial<Record<Category, BreakdownEntry[]>> = {};
   for (const entry of budgetExpenses) {
     if (entry.category) {
       categoryTotals[entry.category] =
         (categoryTotals[entry.category] ?? 0) + Math.abs(entry.amount);
+      (entriesByCategory[entry.category] ??= []).push(entry);
     }
   }
 
@@ -196,6 +199,15 @@ export default async function DashboardPage({
     filteredDbsEntries.filter((e) => e.amount > 0).map((e) => e.amount)
   );
   const periodExpenses = sum(budgetExpenses.map((e) => Math.abs(e.amount)));
+
+  // "View all" from the Budget spend breakdown popup — same period filter,
+  // pre-filtered to just what counts toward budget.
+  const budgetViewAllParams = new URLSearchParams();
+  budgetViewAllParams.set("budget", "counted");
+  if (range !== "month") budgetViewAllParams.set("range", range);
+  if (custom.from) budgetViewAllParams.set("from", custom.from);
+  if (custom.to) budgetViewAllParams.set("to", custom.to);
+  const budgetViewAllHref = `/dbs?${budgetViewAllParams.toString()}`;
 
   // Always the trailing 6 calendar months, independent of the date filter
   // above — a fixed trend window rather than a filtered view.
@@ -347,6 +359,9 @@ export default async function DashboardPage({
               periodIncome={periodIncome}
               periodExpenses={periodExpenses}
               categoryTotals={categoryTotals}
+              entriesByCategory={entriesByCategory}
+              budgetEntries={budgetExpenses}
+              budgetViewAllHref={budgetViewAllHref}
               monthlyTrend={monthlyTrend}
             />
           </div>
@@ -473,6 +488,9 @@ export default async function DashboardPage({
             periodIncome={periodIncome}
             periodExpenses={periodExpenses}
             categoryTotals={categoryTotals}
+            entriesByCategory={entriesByCategory}
+            budgetEntries={budgetExpenses}
+            budgetViewAllHref={budgetViewAllHref}
             monthlyTrend={monthlyTrend}
           />
           <RemindersCard

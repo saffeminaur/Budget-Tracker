@@ -35,15 +35,25 @@ export async function createClient() {
 // redirecting to /login if there isn't one. Memoized per-request with
 // React's cache() so calling it from multiple components/actions in the
 // same render only checks once.
+//
+// Uses getClaims() rather than getUser(): both cryptographically verify the
+// JWT, but getClaims() does it locally against a cached JWKS instead of
+// making a network call to the Supabase Auth server on every single
+// request (it only falls back to a network call if local verification
+// isn't possible, e.g. a symmetric signing key) — see Next's Proxy/DAL
+// guidance in node_modules/next/dist/docs/01-app/02-guides/authentication.md.
 export const requireUser = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getClaims();
 
-  if (!user) {
+  if (error || !data?.claims) {
     redirect("/login");
   }
 
-  return user;
+  const { claims } = data;
+  return {
+    id: claims.sub,
+    email: claims.email as string | undefined,
+    user_metadata: (claims.user_metadata as Record<string, unknown>) ?? {},
+  };
 });

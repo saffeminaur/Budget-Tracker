@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { parseQuickAddText } from "@/lib/gemini";
 import { sanitizeParsedEntry } from "@/lib/parse-quick-add";
 import { todayIsoDate } from "@/lib/utils";
-import type { QuickAddDraft } from "@/lib/types";
+import type { QuickAddDraft, QuickAddType } from "@/lib/types";
 
 // Trusted, unattended ingestion path for bank transaction alert emails.
 // Called by a scheduled Google Apps Script watching Gmail — no browser,
@@ -149,9 +149,23 @@ export async function POST(request: NextRequest) {
 
   const todayIso = todayIsoDate();
 
+  // Sender domain already told us the account with certainty — Gemini's
+  // job is only to work out direction/amount/category/note/date, not to
+  // re-guess the account from ambiguous free text (a DBS PayNow alert
+  // never actually says "DBS" anywhere in the body). Passing this
+  // restricted list constrains the response schema itself, so a
+  // cross-account mismatch is structurally prevented rather than just
+  // checked for after the fact.
+  const expectedTypes: QuickAddType[] =
+    account === "dbs" ? ["dbs_income", "dbs_expense"] : ["maribank_add", "maribank_subtract"];
+
   let raw;
   try {
-    raw = await parseQuickAddText(`Bank email alert:\n\n${subject}\n\n${body}`, todayIso);
+    raw = await parseQuickAddText(
+      `Bank email alert:\n\n${subject}\n\n${body}`,
+      todayIso,
+      expectedTypes
+    );
   } catch (err) {
     const reason = err instanceof Error ? err.message : "Gemini parsing failed.";
     await logIngest(supabase, userId, {
@@ -186,9 +200,10 @@ export async function POST(request: NextRequest) {
   }
 
   const draft = drafts[0];
-  const expectedTypes =
-    account === "dbs" ? ["dbs_income", "dbs_expense"] : ["maribank_add", "maribank_subtract"];
 
+  // Belt-and-suspenders: the response schema already constrained Gemini
+  // to expectedTypes, so this should be unreachable. Kept as a cheap
+  // defensive check in case that guarantee is ever weakened.
   if (!expectedTypes.includes(draft.type)) {
     const reason = `Parsed as "${draft.type}", which doesn't match the detected account (${account}).`;
     await logIngest(supabase, userId, {

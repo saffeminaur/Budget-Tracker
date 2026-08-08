@@ -123,7 +123,11 @@ create table if not exists public.email_ingest_log (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   message_id text not null,
-  status text not null check (status in ('success', 'failed')),
+  -- 'skipped' = recognized as a non-transactional notification from a
+  -- watched sender (e.g. "Manage Card Alert") and deliberately not sent to
+  -- Gemini — logged for dedup/audit, but excluded from the dashboard's
+  -- "Import issues" card since it isn't actually a failure.
+  status text not null check (status in ('success', 'failed', 'skipped')),
   account text check (account in ('dbs', 'maribank')),
   reason text,
   raw_subject text,
@@ -141,6 +145,12 @@ create table if not exists public.email_ingest_log (
 -- Migration for databases created before the "Import issues" dashboard
 -- card was added. Safe to re-run.
 alter table public.email_ingest_log add column if not exists dismissed_at timestamptz;
+
+-- Migration for databases created before the 'skipped' status was added
+-- (non-transactional notification emails, recognized and set aside before
+-- ever reaching Gemini). Safe to re-run.
+alter table public.email_ingest_log drop constraint if exists email_ingest_log_status_check;
+alter table public.email_ingest_log add constraint email_ingest_log_status_check check (status in ('success', 'failed', 'skipped'));
 
 -- ============================================================
 -- Indexes

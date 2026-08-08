@@ -86,7 +86,7 @@ export interface EmailIngestLogEntry {
   id: string;
   user_id: string;
   message_id: string;
-  status: "success" | "failed";
+  status: "success" | "failed" | "skipped";
   account: "dbs" | "maribank" | null;
   reason: string | null;
   raw_subject: string | null;

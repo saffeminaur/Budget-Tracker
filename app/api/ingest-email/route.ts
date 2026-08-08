@@ -44,12 +44,39 @@ function detectAccount(from: string | undefined): Account | null {
   return null;
 }
 
+// Known DBS/MariBank notification subjects that are never transactions —
+// account-management confirmations, e-statement/eDocument notices, etc.
+// They pass the sender-domain check (they're genuinely from the bank) but
+// have no amount to extract. Recognized and skipped before ever calling
+// Gemini, both to keep the dashboard's "Import issues" card free of
+// non-actionable noise and to avoid burning a Gemini call on mail we
+// already know isn't a transaction.
+//
+// Evidence-based, not guessed: only add a subject here once a real
+// "Couldn't extract a valid transaction" case in email_ingest_log
+// confirms it, or the subject is unambiguous on its own (an account-open
+// congratulations or a profile-registration receipt can't contain a
+// PayNow amount). Never add a subject that's also seen on a successful
+// import (e.g. "iBanking Alerts" is a generic subject shared by real
+// transaction emails, so it stays out of this list and goes to Gemini
+// as usual).
+const NON_TRANSACTIONAL_SUBJECTS = new Set([
+  "manage card alert",
+  "your edocument(s) are ready for viewing",
+  "congrats, your mari savings account is open!",
+  "digibank alert - paynow profile registered",
+]);
+
+function isNonTransactionalNotification(subject: string): boolean {
+  return NON_TRANSACTIONAL_SUBJECTS.has(subject.trim().toLowerCase());
+}
+
 async function logIngest(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string,
   fields: {
     messageId: string;
-    status: "success" | "failed";
+    status: "success" | "failed" | "skipped";
     account: Account | null;
     reason: string | null;
     subject: string;
@@ -145,6 +172,19 @@ export async function POST(request: NextRequest) {
       body,
     });
     return NextResponse.json({ error: reason }, { status: 400 });
+  }
+
+  if (isNonTransactionalNotification(subject)) {
+    const reason = `Recognized as a non-transactional "${subject}" notification — not sent to Gemini.`;
+    await logIngest(supabase, userId, {
+      messageId,
+      status: "skipped",
+      account,
+      reason,
+      subject,
+      body,
+    });
+    return NextResponse.json({ ok: true, skipped: true, reason }, { status: 200 });
   }
 
   const todayIso = todayIsoDate();

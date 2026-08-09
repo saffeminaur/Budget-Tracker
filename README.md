@@ -18,7 +18,7 @@ managing my own finances on the go.
 
 ## Live demo
 
-**[TODO: add Vercel deployment URL here]**
+**[budget-tracker-dusky-theta.vercel.app](https://budget-tracker-dusky-theta.vercel.app)**
 
 > Note: this is a single-user app with no public sign-up — the live demo showcases
 > the UI/UX but isn't intended for others to create accounts.
@@ -49,9 +49,27 @@ managing my own finances on the go.
   simple math expressions in the amount (e.g. *"$45/3 split with roommate"*). A
   human-in-the-loop review screen lets you edit or remove anything before
   confirming — nothing is ever saved automatically.
+- **Automated email-based transaction ingestion** — a Google Apps Script watches
+  Gmail for DBS and MariBank transaction alert emails and forwards each one to a
+  dedicated, unattended API route, which uses the sender's domain (not free text)
+  to identify the account with certainty, then Gemini to extract the transaction
+  itself. Known non-transactional notifications from the same senders (e.g. an
+  "account alert preferences updated" confirmation) are recognized by subject and
+  skipped before ever reaching Gemini, rather than logged as failures. Every
+  attempt — success, genuine failure, or recognized skip — is written to an audit
+  log, deduplicated by message ID so a re-forwarded email is a safe no-op.
+- **Import issues tracking** — a dashboard card surfaces any email that
+  genuinely failed to import (unrecognized sender, a parsing miss, a transient
+  API error) with the account, reason, and a preview of the original email, so a
+  missed transaction is never silently lost — dismiss once reviewed, or add it by
+  hand. Collapses to a single "N import issues" line when there's something to
+  review, and disappears entirely when there isn't.
 - **Actionable reminders** — banners for the monthly loan repayment and portfolio
   valuation check-ins, with the confirm/log flow available inline on the dashboard
   itself, no need to navigate to the account page first.
+- **Investments growth chart** — portfolio value plotted against total
+  contributed over time, switchable between daily/monthly/yearly granularity,
+  with contributed/current-value/growth% stat tiles kept in sync with the chart.
 - **Dark/light theme** — a manual toggle, persisted locally, with a dedicated
   color palette per mode (not just an inverted filter) and a flash-free page load.
 - **Installable PWA** — a hand-rolled manifest, service worker, and icon set (no
@@ -59,9 +77,11 @@ managing my own finances on the go.
   launch behavior.
 - **Responsive, mobile-first dashboard** — the mobile dashboard leads with only
   the essentials (net worth, account cards, due reminders) and tucks secondary
-  content (spending charts, recent transactions, portfolio chart, receivables)
-  into collapsible sections, so the first screen is scannable without a long
-  scroll; desktop shows everything expanded.
+  content into collapsible sections, so the first screen is scannable without a
+  long scroll. High-volume lists (recent transactions, auto-imported entries)
+  collapse to a single count by default on both mobile and desktop, and group
+  their contents by date (Today, Yesterday, This week, then actual dates) once
+  expanded, rather than one long undifferentiated feed.
 
 ## Tech stack
 
@@ -69,7 +89,9 @@ managing my own finances on the go.
 - **[Tailwind CSS](https://tailwindcss.com/)** + **[shadcn/ui](https://ui.shadcn.com/)** (built on Base UI)
 - **[Recharts](https://recharts.org/)** for the spending and portfolio-value charts
 - **[Supabase](https://supabase.com/)** — Postgres, Auth, and Row Level Security
-- **[Google Gemini API](https://ai.google.dev/)** for free-text transaction parsing
+- **[Google Gemini API](https://ai.google.dev/)** for free-text transaction parsing,
+  both interactive (Femina AI) and unattended (email ingestion)
+- **Google Apps Script** — watches Gmail and forwards bank alert emails to the app
 - **[Vercel](https://vercel.com/)** for hosting/deployment
 - **GitHub Actions** for CI (build verification on every push)
 
@@ -92,6 +114,19 @@ text, and its output is treated as a **draft**, not a write: the parsed entries
 populate an editable review screen, and nothing reaches the database until the
 user explicitly confirms — the same principle applied to the monthly reminder
 banners, which never insert a record on your behalf, only after you confirm.
+
+**Unattended ingestion pipeline.** `POST /api/ingest-email` has no browser
+session to authenticate with, so it uses a single shared secret (`INGEST_SECRET`,
+compared with a constant-time check) instead of Supabase cookies, and writes
+through a service-role client scoped to a fixed `INGEST_USER_ID` rather than a
+derived session user. Classification happens in a deliberate order: sender
+domain first (the one thing that can't be spoofed by the email's own content),
+then a small evidence-based check for known non-transactional subjects — both
+before Gemini is ever called — and only then does Gemini get asked to extract
+amount/category/date, constrained to the response types valid for the
+already-known account. Every outcome is written to an append-only audit log
+(`email_ingest_log`), keyed uniquely on `(user_id, message_id)` so Apps Script
+re-sending the same email is a safe no-op rather than a duplicate entry.
 
 ## Local setup
 
@@ -124,11 +159,25 @@ Fill in `.env.local` with:
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon/public key |
 | `GEMINI_API_KEY` | Google Gemini API key (free tier) — powers Femina AI. Optional: without it, the rest of the app works normally and Femina AI just shows an error. |
+| `SUPABASE_SERVICE_ROLE_KEY` | From **Project Settings → API**. Bypasses RLS — powers `/api/ingest-email` only, which has no session to authenticate through RLS with. Optional: only needed for automated email ingestion. |
+| `INGEST_USER_ID` | Your own user UUID (**Authentication → Users**). All auto-imported entries are written to this user. Optional, same as above. |
+| `INGEST_SECRET` | Any long random string (e.g. `openssl rand -hex 32`). The Apps Script sender must send this back in an `x-ingest-secret` header. Optional, same as above. |
 
 (An optional `GEMINI_MODEL` variable is also supported if you want to pin a
 specific model instead of the default alias — see `.env.example` for details.)
 
-**3. Run the dev server:**
+**3. (Optional) Set up automated email ingestion:**
+
+The Gmail-watching side lives outside this repo, in a standalone
+[Google Apps Script](https://script.google.com/) bound to the Gmail account
+that receives your bank alert emails. It searches for messages from the
+configured bank sender addresses and POSTs each one to
+`/api/ingest-email` with the `x-ingest-secret` header set to your
+`INGEST_SECRET`, on a time-driven trigger (e.g. every 15 minutes). Skip this
+step if you only want manual/Femina AI entry — every other feature works
+without it.
+
+**4. Run the dev server:**
 
 ```bash
 npm run dev
@@ -145,13 +194,17 @@ app/
                    behind app/(app)/layout.tsx, which enforces auth and
                    renders the header/bottom nav
   login/           Sign-in page
+  api/
+    ingest-email/  Unattended endpoint for the Apps Script email pipeline —
+                   shared-secret auth, no session
 components/        Shared UI: shadcn/ui primitives (components/ui/), charts,
                    forms, and page-level composed components
 lib/               Supabase client setup, shared types, formatting/date
                    utilities, the calculator expression parser, and the
                    Gemini API wrapper
-actions/           Server Actions — one file per account, each re-verifying
-                   the session before touching the database
+actions/           Server Actions — one file per account, plus auth,
+                   quick-add, and the Import Issues dismiss action — each
+                   re-verifying the session before touching the database
 supabase/
   schema.sql       Full database schema and Row Level Security policies
 proxy.ts           Refreshes the Supabase session cookie and redirects

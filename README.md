@@ -25,11 +25,36 @@ managing my own finances on the go.
 
 ## Screenshots
 
-**[TODO: add 2–3 screenshots here]**
+### Dashboard
+A single view of net worth across savings, bank, investments, and receivables.
 
-- Dashboard (net worth, account cards, spending chart)
-- An account page (e.g. Bank or Investments, showing the entry log and filters)
-- The Femina AI quick-add flow (free-text input → parsed review screen)
+![Dashboard](./screenshots/1-dashboard.png)
+
+### Femina AI — log transactions in plain English
+Type a transaction naturally (e.g. "spent $5 on lunch") and Femina AI parses it
+into a structured entry — type, amount, date, category — for you to review
+before saving.
+
+<p float="left">
+  <img src="./screenshots/2-femina-ai-input.png" width="30%" />
+  <img src="./screenshots/3-femina-ai-typed.png" width="30%" />
+  <img src="./screenshots/4-femina-ai-parsed.png" width="30%" />
+</p>
+
+### Spending insights
+Breaks down spending by category over custom time ranges.
+
+![Spending](./screenshots/5-spending.png)
+
+### Investment tracking
+Visualizes portfolio growth against total contributions over time.
+
+![Investments](./screenshots/6-investments.png)
+
+### Bank feed
+Transaction-level detail synced from bank statements, with budget tagging.
+
+![Bank entries](./screenshots/7-bank-entries.png)
 
 ## Key features
 

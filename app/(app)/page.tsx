@@ -38,7 +38,7 @@ import {
 import { ACCOUNT_LABELS } from "@/lib/account-labels";
 import { deleteDbsEntry, setDbsCountsTowardBudget } from "@/actions/dbs";
 import { deleteMaribankEntry } from "@/actions/maribank";
-import { dismissIngestFailure } from "@/actions/email-ingest-log";
+import { dismissIngestFailure, retryIngestFailure } from "@/actions/email-ingest-log";
 import { PiggyBank, Wallet, TrendingUp, Landmark, Users } from "lucide-react";
 import type {
   Category,
@@ -91,7 +91,7 @@ export default async function DashboardPage({
     supabase
       .from("email_ingest_log")
       .select("*")
-      .eq("status", "failed")
+      .in("status", ["failed", "pending"])
       .is("dismissed_at", null)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -264,11 +264,13 @@ export default async function DashboardPage({
   const importIssues: ImportIssue[] = ((ingestFailuresData ?? []) as EmailIngestLogEntry[]).map(
     (log) => ({
       id: log.id,
+      status: log.status as "failed" | "pending",
       reason: log.reason,
       account: log.account,
       rawSubject: log.raw_subject,
       rawBody: log.raw_body,
       createdAt: log.created_at,
+      retryCount: log.retry_count,
     })
   );
 
@@ -324,7 +326,7 @@ export default async function DashboardPage({
           without a long scroll. Desktop keeps the original always-expanded
           layout, unchanged, in the block below. */}
       <div className="space-y-3 sm:hidden">
-        <ImportIssuesCard issues={importIssues} dismissAction={dismissIngestFailure} />
+        <ImportIssuesCard issues={importIssues} dismissAction={dismissIngestFailure} retryAction={retryIngestFailure} />
 
         <RemindersCard
           dueForMonth={now}
@@ -468,7 +470,7 @@ export default async function DashboardPage({
       </div>
 
       <div className="hidden space-y-4 sm:block">
-        <ImportIssuesCard issues={importIssues} dismissAction={dismissIngestFailure} />
+        <ImportIssuesCard issues={importIssues} dismissAction={dismissIngestFailure} retryAction={retryIngestFailure} />
 
         <QuickAdd />
 

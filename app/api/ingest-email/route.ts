@@ -2,10 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { parseQuickAddText } from "@/lib/gemini";
-import { sanitizeParsedEntry } from "@/lib/parse-quick-add";
-import { todayIsoDate } from "@/lib/utils";
-import type { QuickAddDraft, QuickAddType } from "@/lib/types";
+import { attemptEmailImport } from "@/lib/email-ingest";
 
 // Trusted, unattended ingestion path for bank transaction alert emails.
 // Called by a scheduled Google Apps Script watching Gmail — no browser,
@@ -13,6 +10,11 @@ import type { QuickAddDraft, QuickAddType } from "@/lib/types";
 // instead of Supabase cookies, and writes go through the service-role
 // client (see lib/supabase/service.ts) scoped to a fixed INGEST_USER_ID,
 // since there's no session to derive a user from.
+//
+// Gives Gemini's own retry/backoff (lib/gemini.ts) room to run without
+// this function being killed mid-request by the platform's default
+// timeout.
+export const maxDuration = 60;
 
 type Account = "dbs" | "maribank";
 
@@ -76,7 +78,7 @@ async function logIngest(
   userId: string,
   fields: {
     messageId: string;
-    status: "success" | "failed" | "skipped";
+    status: "success" | "failed" | "skipped" | "pending";
     account: Account | null;
     reason: string | null;
     subject: string;
@@ -187,131 +189,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, skipped: true, reason }, { status: 200 });
   }
 
-  const todayIso = todayIsoDate();
-
   // Sender domain already told us the account with certainty — Gemini's
   // job is only to work out direction/amount/category/note/date, not to
   // re-guess the account from ambiguous free text (a DBS PayNow alert
-  // never actually says "DBS" anywhere in the body). Passing this
-  // restricted list constrains the response schema itself, so a
-  // cross-account mismatch is structurally prevented rather than just
-  // checked for after the fact.
-  const expectedTypes: QuickAddType[] =
-    account === "dbs" ? ["dbs_income", "dbs_expense"] : ["maribank_add", "maribank_subtract"];
-
-  let raw;
-  try {
-    raw = await parseQuickAddText(
-      `Bank email alert:\n\n${subject}\n\n${body}`,
-      todayIso,
-      expectedTypes
-    );
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : "Gemini parsing failed.";
-    await logIngest(supabase, userId, {
-      messageId,
-      status: "failed",
-      account,
-      reason,
-      subject,
-      body,
-    });
-    return NextResponse.json({ error: reason }, { status: 502 });
-  }
-
-  const drafts = raw
-    .map((r) => sanitizeParsedEntry(r, todayIso))
-    .filter((e): e is QuickAddDraft => e !== null);
-
-  if (drafts.length !== 1) {
-    const reason =
-      drafts.length === 0
-        ? "Couldn't extract a valid transaction (no amount detected, or nothing recognizable)."
-        : `Expected exactly one transaction in this email, parsed ${drafts.length}.`;
-    await logIngest(supabase, userId, {
-      messageId,
-      status: "failed",
-      account,
-      reason,
-      subject,
-      body,
-    });
-    return NextResponse.json({ error: reason }, { status: 422 });
-  }
-
-  const draft = drafts[0];
-
-  // Belt-and-suspenders: the response schema already constrained Gemini
-  // to expectedTypes, so this should be unreachable. Kept as a cheap
-  // defensive check in case that guarantee is ever weakened.
-  if (!expectedTypes.includes(draft.type)) {
-    const reason = `Parsed as "${draft.type}", which doesn't match the detected account (${account}).`;
-    await logIngest(supabase, userId, {
-      messageId,
-      status: "failed",
-      account,
-      reason,
-      subject,
-      body,
-    });
-    return NextResponse.json({ error: reason }, { status: 422 });
-  }
-
-  const table = account === "dbs" ? "dbs_entries" : "maribank_entries";
-  const insertPayload: Record<string, unknown> =
-    account === "dbs"
-      ? {
-          user_id: userId,
-          amount: draft.type === "dbs_expense" ? -draft.amount : draft.amount,
-          category: draft.type === "dbs_expense" ? draft.category : null,
-          note: draft.note || null,
-          entry_date: draft.entry_date,
-          // Opt-IN, not opt-out: most auto-imported DBS transactions
-          // aren't personal spending, so they start excluded from budget
-          // totals until manually toggled on from the dashboard.
-          counts_toward_budget: draft.type === "dbs_expense" ? false : true,
-          source: "auto_import",
-        }
-      : {
-          user_id: userId,
-          amount: draft.type === "maribank_subtract" ? -draft.amount : draft.amount,
-          note: draft.note || null,
-          entry_date: draft.entry_date,
-          source: "auto_import",
-        };
-
-  const { data: inserted, error: insertError } = await supabase
-    .from(table)
-    .insert(insertPayload)
-    .select()
-    .single();
-
-  if (insertError || !inserted) {
-    const reason = insertError?.message ?? "Insert failed for an unknown reason.";
-    await logIngest(supabase, userId, {
-      messageId,
-      status: "failed",
-      account,
-      reason,
-      subject,
-      body,
-    });
-    return NextResponse.json({ error: reason }, { status: 500 });
-  }
+  // never actually says "DBS" anywhere in the body). attemptEmailImport
+  // passes this through as a restricted type list that constrains the
+  // response schema itself, so a cross-account mismatch is structurally
+  // prevented rather than just checked for after the fact. If Gemini is
+  // overloaded through every retry and the fallback model, it comes back
+  // as status "pending" rather than "failed" — the raw email is already
+  // captured below either way, so nothing is lost while it waits to be
+  // retried (scheduled job, or a manual Retry from the dashboard).
+  const result = await attemptEmailImport(supabase, userId, { account, subject, body });
 
   await logIngest(supabase, userId, {
     messageId,
-    status: "success",
+    status: result.status,
     account,
-    reason: null,
+    reason: result.reason,
     subject,
     body,
-    entryTable: table,
-    entryId: inserted.id,
+    entryTable: result.entryTable,
+    entryId: result.entryId,
   });
 
-  revalidatePath(account === "dbs" ? "/dbs" : "/maribank");
-  revalidatePath("/");
+  if (result.status === "failed") {
+    return NextResponse.json({ error: result.reason }, { status: 502 });
+  }
 
-  return NextResponse.json({ ok: true, account, entry: inserted }, { status: 201 });
+  revalidatePath("/");
+  if (result.status === "pending") {
+    return NextResponse.json({ ok: true, pending: true, reason: result.reason }, { status: 202 });
+  }
+
+  revalidatePath(account === "dbs" ? "/dbs" : "/maribank");
+  return NextResponse.json({ ok: true, account, entryId: result.entryId }, { status: 201 });
 }

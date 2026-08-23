@@ -127,7 +127,12 @@ create table if not exists public.email_ingest_log (
   -- watched sender (e.g. "Manage Card Alert") and deliberately not sent to
   -- Gemini — logged for dedup/audit, but excluded from the dashboard's
   -- "Import issues" card since it isn't actually a failure.
-  status text not null check (status in ('success', 'failed', 'skipped')),
+  -- 'pending' = Gemini was overloaded (503/UNAVAILABLE) through every
+  -- retry and the fallback model — see lib/gemini.ts and
+  -- lib/email-ingest.ts. The raw email is kept intact and retried later
+  -- (scheduled /api/ingest-email/retry, or a manual Retry from the
+  -- dashboard) rather than being surfaced as a hard failure.
+  status text not null check (status in ('success', 'failed', 'skipped', 'pending')),
   account text check (account in ('dbs', 'maribank')),
   reason text,
   raw_subject text,
@@ -139,6 +144,9 @@ create table if not exists public.email_ingest_log (
   -- row. Soft-dismiss rather than delete, so the audit trail survives —
   -- the dashboard just stops showing it.
   dismissed_at timestamptz,
+  -- How many times this row has been retried (manually, or by the
+  -- scheduled retry job), across every status it has passed through.
+  retry_count integer not null default 0,
   unique (user_id, message_id)
 );
 
@@ -146,11 +154,14 @@ create table if not exists public.email_ingest_log (
 -- card was added. Safe to re-run.
 alter table public.email_ingest_log add column if not exists dismissed_at timestamptz;
 
--- Migration for databases created before the 'skipped' status was added
--- (non-transactional notification emails, recognized and set aside before
--- ever reaching Gemini). Safe to re-run.
+-- Migration for databases created before the 'pending' status (Gemini
+-- outage retry) was added. Safe to re-run.
+alter table public.email_ingest_log add column if not exists retry_count integer not null default 0;
+
+-- Migration for databases created before the 'skipped'/'pending' statuses
+-- were added. Safe to re-run.
 alter table public.email_ingest_log drop constraint if exists email_ingest_log_status_check;
-alter table public.email_ingest_log add constraint email_ingest_log_status_check check (status in ('success', 'failed', 'skipped'));
+alter table public.email_ingest_log add constraint email_ingest_log_status_check check (status in ('success', 'failed', 'skipped', 'pending'));
 
 -- ============================================================
 -- Indexes

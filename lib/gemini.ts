@@ -8,6 +8,16 @@ import { CATEGORIES, QUICK_ADD_TYPES, type QuickAddType } from "@/lib/types";
 // need to be manually bumped every time that happens.
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 
+// Tried once, only after GEMINI_MODEL has exhausted every retry while
+// still overloaded (see callGeminiWithRetry below) — a different
+// model/tier so an outage on one doesn't necessarily also affect the
+// other. Set this equal to GEMINI_MODEL to disable the fallback.
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-flash-lite-latest";
+
+// Delay before each retry after a 503/UNAVAILABLE response — three
+// retries (four attempts total) with 1s/2s/4s backoff.
+const RETRY_DELAYS_MS = [1000, 2000, 4000];
+
 // One line of prose per type, reused to build both the full instruction
 // (all nine, for the free-text Femina AI flow, where the account isn't
 // known ahead of time) and a restricted instruction (for callers like
@@ -105,22 +115,56 @@ function extractJsonArray(text: string): unknown {
   }
 }
 
-export async function parseQuickAddText(
-  text: string,
-  todayIso: string,
-  // Defaults to all nine types — the free-text Femina AI flow doesn't
-  // know the account ahead of time, so Gemini has to determine it from
-  // content. Callers that already know the account (see buildResponseSchema
-  // above) should pass a narrowed list instead of validating after the fact.
-  allowedTypes: readonly QuickAddType[] = QUICK_ADD_TYPES
-): Promise<RawParsedEntry[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured on the server.");
-  }
+// Gemini signals two different "not my fault, try elsewhere" conditions,
+// and they call for different responses:
+// - "overloaded" (HTTP 503 / status "UNAVAILABLE"): the model is
+//   momentarily over capacity — retrying the same model shortly after
+//   usually succeeds, hence the backoff loop below.
+// - "quota_exceeded" (HTTP 429 / status "RESOURCE_EXHAUSTED"): this
+//   specific model's quota on the API key is used up — retrying the same
+//   model immediately just fails again with the same error. Gemini
+//   quotas are allocated per model though, so GEMINI_FALLBACK_MODEL often
+//   still has headroom even when GEMINI_MODEL doesn't.
+//
+// Thrown once every applicable retry — and the fallback model, if
+// configured — has failed the same way. Callers that persist a "pending"
+// state instead of a hard failure (see lib/email-ingest.ts) check
+// specifically for this, to distinguish "try again later" from a
+// genuine parsing failure that retrying won't fix.
+export class GeminiUnavailableError extends Error {
+  readonly kind: "overloaded" | "quota_exceeded";
 
+  constructor(message: string, kind: "overloaded" | "quota_exceeded") {
+    super(message);
+    this.name = "GeminiUnavailableError";
+    this.kind = kind;
+  }
+}
+
+function classifyUnavailable(
+  status: number,
+  bodyText: string
+): "overloaded" | "quota_exceeded" | null {
+  if (status === 503 || /"status"\s*:\s*"UNAVAILABLE"/i.test(bodyText)) return "overloaded";
+  if (status === 429 || /"status"\s*:\s*"RESOURCE_EXHAUSTED"/i.test(bodyText)) {
+    return "quota_exceeded";
+  }
+  return null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callGeminiOnce(
+  model: string,
+  apiKey: string,
+  systemInstruction: string,
+  text: string,
+  schema: ReturnType<typeof buildResponseSchema>
+): Promise<RawParsedEntry[]> {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
       headers: {
@@ -128,13 +172,11 @@ export async function parseQuickAddText(
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: SYSTEM_INSTRUCTION(todayIso, allowedTypes) }],
-        },
+        systemInstruction: { parts: [{ text: systemInstruction }] },
         contents: [{ role: "user", parts: [{ text }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: buildResponseSchema(allowedTypes),
+          responseSchema: schema,
           temperature: 0.1,
         },
       }),
@@ -143,7 +185,12 @@ export async function parseQuickAddText(
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`Gemini API error (${response.status}): ${body.slice(0, 300)}`);
+    const message = `Gemini API error (${response.status}): ${body.slice(0, 300)}`;
+    const kind = classifyUnavailable(response.status, body);
+    if (kind) {
+      throw new GeminiUnavailableError(message, kind);
+    }
+    throw new Error(message);
   }
 
   const data = await response.json();
@@ -160,4 +207,62 @@ export async function parseQuickAddText(
   }
 
   return parsed as RawParsedEntry[];
+}
+
+// Retries with backoff only on "overloaded" — a genuine parsing/schema
+// error would just fail the same way again, and "quota_exceeded" against
+// the same model won't clear in seconds, so both skip straight to
+// rethrowing (parseQuickAddText's fallback-model attempt below is the
+// next line of defense for either).
+async function callGeminiWithRetry(
+  model: string,
+  apiKey: string,
+  systemInstruction: string,
+  text: string,
+  schema: ReturnType<typeof buildResponseSchema>
+): Promise<RawParsedEntry[]> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await callGeminiOnce(model, apiKey, systemInstruction, text, schema);
+    } catch (err) {
+      const canRetrySameModel =
+        err instanceof GeminiUnavailableError &&
+        err.kind === "overloaded" &&
+        attempt < RETRY_DELAYS_MS.length;
+      if (!canRetrySameModel) {
+        throw err;
+      }
+      await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+  }
+}
+
+export async function parseQuickAddText(
+  text: string,
+  todayIso: string,
+  // Defaults to all nine types — the free-text Femina AI flow doesn't
+  // know the account ahead of time, so Gemini has to determine it from
+  // content. Callers that already know the account (see buildResponseSchema
+  // above) should pass a narrowed list instead of validating after the fact.
+  allowedTypes: readonly QuickAddType[] = QUICK_ADD_TYPES
+): Promise<RawParsedEntry[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured on the server.");
+  }
+
+  const systemInstruction = SYSTEM_INSTRUCTION(todayIso, allowedTypes);
+  const schema = buildResponseSchema(allowedTypes);
+
+  try {
+    return await callGeminiWithRetry(GEMINI_MODEL, apiKey, systemInstruction, text, schema);
+  } catch (err) {
+    if (!(err instanceof GeminiUnavailableError) || GEMINI_FALLBACK_MODEL === GEMINI_MODEL) {
+      throw err;
+    }
+    // GEMINI_MODEL is still overloaded after every retry — one shot at
+    // the fallback model/tier before giving up. If this also fails, the
+    // GeminiUnavailableError propagates to the caller unchanged.
+    return await callGeminiOnce(GEMINI_FALLBACK_MODEL, apiKey, systemInstruction, text, schema);
+  }
 }

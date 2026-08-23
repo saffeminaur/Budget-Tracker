@@ -86,7 +86,9 @@ export interface EmailIngestLogEntry {
   id: string;
   user_id: string;
   message_id: string;
-  status: "success" | "failed" | "skipped";
+  // 'pending' = Gemini was overloaded through every retry and the
+  // fallback model — retried later rather than surfaced as a failure.
+  status: "success" | "failed" | "skipped" | "pending";
   account: "dbs" | "maribank" | null;
   reason: string | null;
   raw_subject: string | null;
@@ -95,6 +97,7 @@ export interface EmailIngestLogEntry {
   entry_id: string | null;
   created_at: string;
   dismissed_at: string | null;
+  retry_count: number;
 }
 
 // ============================================================

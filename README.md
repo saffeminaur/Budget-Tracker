@@ -82,11 +82,18 @@ Transaction-level detail synced from bank statements, with budget tagging.
   "account alert preferences updated" confirmation) are recognized by subject and
   skipped before ever reaching Gemini, rather than logged as failures. Every
   attempt — success, genuine failure, or recognized skip — is written to an audit
-  log, deduplicated by message ID so a re-forwarded email is a safe no-op.
+  log, deduplicated by message ID so a re-forwarded email is a safe no-op. A
+  Gemini 503/overload is retried with exponential backoff (three retries, then
+  one attempt on a secondary model) rather than treated as a failure; if it's
+  still unavailable after that, the email is kept as "pending" with its raw
+  content intact and retried automatically by a scheduled job
+  (`GET /api/ingest-email/retry`, `vercel.json`), so a temporary outage recovers
+  quietly instead of losing the transaction.
 - **Import issues tracking** — a dashboard card surfaces any email that
-  genuinely failed to import (unrecognized sender, a parsing miss, a transient
-  API error) with the account, reason, and a preview of the original email, so a
-  missed transaction is never silently lost — dismiss once reviewed, or add it by
+  genuinely failed to import (unrecognized sender, a parsing miss) or is still
+  waiting on a Gemini retry, with the account, reason, and a preview of the
+  original email, so a missed transaction is never silently lost — dismiss once
+  reviewed, retry immediately instead of waiting for the schedule, or add it by
   hand. Collapses to a single "N import issues" line when there's something to
   review, and disappears entirely when there isn't.
 - **Actionable reminders** — banners for the monthly loan repayment and portfolio

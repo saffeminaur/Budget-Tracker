@@ -1,9 +1,17 @@
-const CACHE_NAME = "budget-tracker-v1";
+// Bumped so already-installed clients pick up the new app icon set —
+// changing this file's bytes is what triggers the browser's
+// service-worker update check; the version bump then forces a fresh
+// cache (see activate below, which deletes any cache key that isn't
+// this one) instead of continuing to serve the old cached icon bytes
+// forever under the old cache name.
+const CACHE_NAME = "budget-tracker-v2";
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
+  "/icons/favicon.ico",
+  "/icons/femina_icon.svg",
 ];
 
 self.addEventListener("install", (event) => {

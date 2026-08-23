@@ -20,6 +20,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      // SVG first — browsers that support it prefer it over the raster
+      // fallbacks below (crisper, scales to any chrome size).
+      { url: "/icons/femina_icon.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/icons/favicon.ico", sizes: "any" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],

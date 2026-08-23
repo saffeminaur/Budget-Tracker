@@ -27,9 +27,7 @@ export function RecentTransactionsList({ entries }: RecentTransactionsListProps)
     <Collapsible>
       <Card className="py-0">
         <CollapsibleTrigger className="group/trigger flex items-center justify-between gap-2 px-4 py-3">
-          <span className="min-w-0 font-medium">
-            Recent transactions ({entries.length})
-          </span>
+          <span className="min-w-0 font-medium">Recent transactions</span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[panel-open]/trigger:rotate-180" />
         </CollapsibleTrigger>
         <CollapsiblePanel>
@@ -46,17 +44,19 @@ export function RecentTransactionsList({ entries }: RecentTransactionsListProps)
                   </p>
                   <ul className="divide-y">
                     {group.entries.map((entry) => (
-                      <li key={entry.id} className="flex items-center gap-3 py-2.5">
+                      <li key={entry.id} className="flex items-start gap-3 py-2.5">
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                          <div className="flex items-start gap-2">
+                            <span className="mt-0.5 shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
                               {entry.category ?? "Income"}
                             </span>
                             {entry.note && (
-                              <span className="truncate text-sm">{entry.note}</span>
+                              <span className="min-w-0 flex-1 text-sm break-words">
+                                {entry.note}
+                              </span>
                             )}
                             {entry.category && !entry.counts_toward_budget && (
-                              <span className="shrink-0 text-[10px] text-muted-foreground">
+                              <span className="mt-0.5 shrink-0 text-[10px] text-muted-foreground">
                                 Excluded
                               </span>
                             )}
@@ -68,8 +68,8 @@ export function RecentTransactionsList({ entries }: RecentTransactionsListProps)
                         <span
                           className={
                             entry.amount < 0
-                              ? "font-medium text-destructive"
-                              : "font-medium text-success"
+                              ? "mt-0.5 shrink-0 font-medium text-destructive"
+                              : "mt-0.5 shrink-0 font-medium text-success"
                           }
                         >
                           {entry.amount > 0 ? "+" : ""}

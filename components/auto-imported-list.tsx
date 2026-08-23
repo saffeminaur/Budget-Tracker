@@ -59,9 +59,7 @@ export function AutoImportedList({
     <Collapsible>
       <Card className="py-0">
         <CollapsibleTrigger className="group/trigger flex items-center justify-between gap-2 px-4 py-3">
-          <span className="min-w-0 font-medium">
-            Recently auto-added ({entries.length})
-          </span>
+          <span className="min-w-0 font-medium">Recently auto-added</span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[panel-open]/trigger:rotate-180" />
         </CollapsibleTrigger>
         <CollapsiblePanel>
@@ -73,14 +71,16 @@ export function AutoImportedList({
                 </p>
                 <ul className="divide-y">
                   {group.entries.map((entry) => (
-                    <li key={entry.id} className="flex items-center gap-3 py-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                    <li key={entry.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3">
+                      <div className="min-w-0 flex-1 basis-full sm:basis-0">
+                        <div className="flex items-start gap-2">
+                          <span className="mt-0.5 shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
                             {ACCOUNT_LABELS[entry.account].tag}
                           </span>
                           {entry.note && (
-                            <span className="truncate text-sm">{entry.note}</span>
+                            <span className="min-w-0 flex-1 text-sm break-words">
+                              {entry.note}
+                            </span>
                           )}
                         </div>
                         <span className="text-xs text-muted-foreground">
@@ -88,41 +88,43 @@ export function AutoImportedList({
                         </span>
                       </div>
 
-                      {entry.countsTowardBudget !== undefined && (
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <Label
-                            htmlFor={`auto-counts-${entry.id}`}
-                            className="text-[10px] text-muted-foreground"
-                          >
-                            Budget
-                          </Label>
-                          <Switch
-                            id={`auto-counts-${entry.id}`}
-                            size="sm"
-                            checked={entry.countsTowardBudget}
-                            disabled={isPending}
-                            onCheckedChange={(checked) => handleToggle(entry.id, checked)}
-                          />
-                        </div>
-                      )}
+                      <div className="ml-auto flex shrink-0 items-center gap-3 sm:ml-0">
+                        {entry.countsTowardBudget !== undefined && (
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <Label
+                              htmlFor={`auto-counts-${entry.id}`}
+                              className="text-[10px] text-muted-foreground"
+                            >
+                              Budget
+                            </Label>
+                            <Switch
+                              id={`auto-counts-${entry.id}`}
+                              size="sm"
+                              checked={entry.countsTowardBudget}
+                              disabled={isPending}
+                              onCheckedChange={(checked) => handleToggle(entry.id, checked)}
+                            />
+                          </div>
+                        )}
 
-                      <span
-                        className={
-                          entry.amount < 0
-                            ? "font-medium text-destructive"
-                            : "font-medium text-success"
-                        }
-                      >
-                        {entry.amount > 0 ? "+" : ""}
-                        {formatCurrency(entry.amount)}
-                      </span>
+                        <span
+                          className={
+                            entry.amount < 0
+                              ? "font-medium text-destructive"
+                              : "font-medium text-success"
+                          }
+                        >
+                          {entry.amount > 0 ? "+" : ""}
+                          {formatCurrency(entry.amount)}
+                        </span>
 
-                      <form
-                        action={entry.account === "dbs" ? deleteDbsAction : deleteMaribankAction}
-                      >
-                        <input type="hidden" name="id" value={entry.id} />
-                        <DeleteEntryButton />
-                      </form>
+                        <form
+                          action={entry.account === "dbs" ? deleteDbsAction : deleteMaribankAction}
+                        >
+                          <input type="hidden" name="id" value={entry.id} />
+                          <DeleteEntryButton />
+                        </form>
+                      </div>
                     </li>
                   ))}
                 </ul>

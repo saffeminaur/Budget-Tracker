@@ -117,60 +117,62 @@ export function EntryList({
   return (
     <ul className="divide-y">
       {entries.map((entry) => (
-        <li key={entry.id} className="flex items-center gap-3 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+        <li key={entry.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3">
+          <div className="min-w-0 flex-1 basis-full sm:basis-0">
+            <div className="flex items-start gap-2">
               {entry.badge && (
-                <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                <span className="mt-0.5 shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
                   {entry.badge}
                 </span>
               )}
               {entry.note && (
-                <span className="truncate text-sm">{entry.note}</span>
-              )}
-              {entry.countsTowardBudget === false && (
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  Excluded from budget
-                </span>
+                <span className="min-w-0 flex-1 text-sm break-words">{entry.note}</span>
               )}
             </div>
+            {entry.countsTowardBudget === false && (
+              <span className="block text-[10px] text-muted-foreground">
+                Excluded from budget
+              </span>
+            )}
             <span className="text-xs text-muted-foreground">
               {formatDate(entry.entry_date)}
             </span>
           </div>
-          <span
-            className={
-              showSign
-                ? entry.amount < 0
-                  ? "font-medium text-destructive"
-                  : "font-medium text-success"
-                : "font-medium"
-            }
-          >
-            {showSign && entry.amount > 0 ? "+" : ""}
-            {formatCurrency(entry.amount)}
-          </span>
-          {updateAction && (
-            <EditEntryButton
-              action={updateAction}
-              entryId={entry.id}
-              dialogTitle={editDialogTitle}
-              amount={entry.amount}
-              note={entry.note}
-              entryDate={entry.entry_date}
-              signed={showSign}
-              positiveLabel={editPositiveLabel}
-              negativeLabel={editNegativeLabel}
-              amountLabel={editAmountLabel}
-              showNote={editShowNote}
-              extraField={buildExtraField(entry, editExtraField)}
-              extraFieldForSign={editExtraFieldForSign}
-            />
-          )}
-          <form action={deleteAction}>
-            <input type="hidden" name="id" value={entry.id} />
-            <DeleteEntryButton />
-          </form>
+          <div className="ml-auto flex shrink-0 items-center gap-3 sm:ml-0">
+            <span
+              className={
+                showSign
+                  ? entry.amount < 0
+                    ? "font-medium text-destructive"
+                    : "font-medium text-success"
+                  : "font-medium"
+              }
+            >
+              {showSign && entry.amount > 0 ? "+" : ""}
+              {formatCurrency(entry.amount)}
+            </span>
+            {updateAction && (
+              <EditEntryButton
+                action={updateAction}
+                entryId={entry.id}
+                dialogTitle={editDialogTitle}
+                amount={entry.amount}
+                note={entry.note}
+                entryDate={entry.entry_date}
+                signed={showSign}
+                positiveLabel={editPositiveLabel}
+                negativeLabel={editNegativeLabel}
+                amountLabel={editAmountLabel}
+                showNote={editShowNote}
+                extraField={buildExtraField(entry, editExtraField)}
+                extraFieldForSign={editExtraFieldForSign}
+              />
+            )}
+            <form action={deleteAction}>
+              <input type="hidden" name="id" value={entry.id} />
+              <DeleteEntryButton />
+            </form>
+          </div>
         </li>
       ))}
     </ul>
